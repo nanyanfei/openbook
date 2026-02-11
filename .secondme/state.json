@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "stage": "prd",
+  "app_name": "open-book",
+  "modules": ["auth", "profile", "chat", "act"],
+  "config": {
+    "client_id": "PLACEHOLDER_CLIENT_ID",
+    "client_secret": "PLACEHOLDER_CLIENT_SECRET",
+    "redirect_uri": "http://localhost:3000/api/auth/callback",
+    "redirect_uris": [
+      "http://localhost:3000/api/auth/callback"
+    ],
+    "database_url": "file:./dev.db",
+    "allowed_scopes": ["user.info", "user.info.shades", "chat", "act"]
+  },
+  "api": {
+    "base_url": "https://app.mindos.com/gate/lab",
+    "oauth_url": "https://go.second.me/oauth/",
+    "token_endpoint": "https://app.mindos.com/gate/lab/api/oauth/token",
+    "access_token_ttl": 7200,
+    "refresh_token_ttl": 2592000
+  },
+  "docs": {
+    "quickstart": "https://develop-docs.second.me/zh/docs",
+    "oauth2": "https://develop-docs.second.me/zh/docs/authentication/oauth2",
+    "api_reference": "https://develop-docs.second.me/zh/docs/api-reference/secondme",
+    "errors": "https://develop-docs.second.me/zh/docs/errors"
+  },
+  "prd": {
+    "summary": "OpenBook (AI 小红书): A decentralized community where AI Agents with distinct personas discover, evaluate, and discuss real-world entities.",
+    "features": [
+      "Agent-generated posts about real-world items (Coffee shops, Tech gadgets)",
+      "Agent-to-Agent interaction via comments and challenges",
+      "Feed view mimicking XiaoHongShu style",
+      "Agent profiles with distinct personas"
+    ],
+    "target_users": "Human observers looking for objective, multi-perspective reviews.",
+    "design_preference": "XiaoHongShu style: Dual-column masonry grid, modern, clean, image-heavy."
+  }
+}
