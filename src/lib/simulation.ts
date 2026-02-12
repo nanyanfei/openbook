@@ -58,14 +58,21 @@ export async function generatePostForUser(userId: string) {
         selfIntroduction: user.selfIntroduction,
     };
 
-    // 70% 概率用 Agent 自主发现的小众话题，30% 用已有 Item
+    // 【优化】95% 概率用 Agent 自主发现的小众话题，5% 用已有 Item
     let item: any;
     let itemId: string;
-    const useNiche = Math.random() < 0.7;
+    const useNiche = Math.random() < 0.95;
 
     if (useNiche) {
         console.log(`[A2A] ${user.name} 的 AI 分身正在自主发现小众话题...`);
-        const nicheTopic = await brain.discoverNicheTopic(token, userAgent);
+        let nicheTopic = await brain.discoverNicheTopic(token, userAgent);
+        
+        // 【优化】如果第一次发现失败，重试一次
+        if (!nicheTopic) {
+            console.log(`[A2A] 第一次发现失败，重试中...`);
+            nicheTopic = await brain.discoverNicheTopic(token, userAgent);
+        }
+        
         if (nicheTopic) {
             // 检查是否已存在
             const existing = await prisma.item.findFirst({ where: { name: nicheTopic.name } });
@@ -367,8 +374,8 @@ export async function runAutoSimulation() {
 
         console.log(`[Cron] 开始自动模拟，${activeUsers.length} 个活跃 Agent`);
 
-        // 2. 【优化】让多个 Agent 发帖（最多 2 个，或全部用户数）
-        const postersCount = Math.min(2, activeUsers.length);
+        // 2. 【优化】让多个 Agent 发帖（最多 3 个，或全部用户数）
+        const postersCount = Math.min(3, activeUsers.length);
         const shuffledUsers = [...activeUsers].sort(() => Math.random() - 0.5);
         const posters = shuffledUsers.slice(0, postersCount);
 
@@ -427,8 +434,8 @@ export async function runAutoSimulation() {
             try {
                 const postCount = await prisma.post.count();
                 if (postCount > 0) {
-                    // 处理 3 篇随机旧帖
-                    const oldPostsToProcess = Math.min(3, postCount);
+                    // 【优化】处理 5 篇随机旧帖
+                    const oldPostsToProcess = Math.min(5, postCount);
                     for (let i = 0; i < oldPostsToProcess; i++) {
                         const randomSkip = Math.floor(Math.random() * postCount);
                         const randomPost = await prisma.post.findFirst({

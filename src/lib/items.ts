@@ -129,6 +129,110 @@ export const MOCK_ITEMS = [
             "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&h=800&fit=crop",
         ],
     },
+    // === 【新增】独立游戏 ===
+    {
+        name: "Celeste (蔚蓝)",
+        category: "独立游戏",
+        location: "全球",
+        metadata: { price: 2, rating: 4.9, type: "Platformer", specialty: "像素艺术 + 心理治愈叙事", platform: "PC/Switch/PS" },
+        images: [
+            "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&h=800&fit=crop",
+        ],
+    },
+    {
+        name: "Hollow Knight (空洞骑士)",
+        category: "独立游戏",
+        location: "全球",
+        metadata: { price: 2, rating: 4.9, type: "Metroidvania", specialty: "手绘美术 + 高难度 Boss", platform: "PC/Switch/PS" },
+        images: [
+            "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&h=800&fit=crop",
+        ],
+    },
+    // === 【新增】小众 App ===
+    {
+        name: "Obsidian",
+        category: "小众App",
+        location: "全球",
+        metadata: { price: 0, rating: 4.8, type: "Knowledge Management", specialty: "双向链接笔记 + 本地优先", platform: "跨平台" },
+        images: [
+            "https://images.unsplash.com/photo-1517842645767-c639042777db?w=600&h=800&fit=crop",
+        ],
+    },
+    {
+        name: "Arc Browser",
+        category: "小众App",
+        location: "全球",
+        metadata: { price: 0, rating: 4.7, type: "Browser", specialty: "革新性浏览器体验 + Space 工作区", platform: "Mac/iOS" },
+        images: [
+            "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=600&h=800&fit=crop",
+        ],
+    },
+    // === 【新增】独立品牌 ===
+    {
+        name: "Aesop 伊索",
+        category: "独立护肤品牌",
+        location: "澳大利亚 · 墨尔本",
+        metadata: { price: 4, rating: 4.7, type: "Skincare", specialty: "植物成分 + 极简包装美学", founded: 1987 },
+        images: [
+            "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=800&fit=crop",
+        ],
+    },
+    {
+        name: "Freitag",
+        category: "独立背包品牌",
+        location: "瑞士 · 苏黎世",
+        metadata: { price: 4, rating: 4.6, type: "Bags", specialty: "回收卡车篷布制作 + 每个独一无二", founded: 1993 },
+        images: [
+            "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&h=800&fit=crop",
+        ],
+    },
+    // === 【新增】全球小众空间 ===
+    {
+        name: "Blue Bottle Coffee (清澄白河店)",
+        category: "独立咖啡",
+        location: "东京 · 清澄白河",
+        metadata: { price: 4, rating: 4.7, type: "Third Wave Coffee", specialty: "仓库改造 + 单一产地精品", wifi: "None" },
+        images: [
+            "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&h=800&fit=crop",
+        ],
+    },
+    {
+        name: "Shakespeare and Company",
+        category: "独立书店",
+        location: "巴黎 · 左岸",
+        metadata: { price: 2, rating: 4.9, type: "Historic Bookshop", specialty: "文学朝圣地 + 可借宿", founded: 1951 },
+        images: [
+            "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=600&h=800&fit=crop",
+        ],
+    },
+    {
+        name: "Powell's City of Books",
+        category: "独立书店",
+        location: "波特兰 · 珍珠区",
+        metadata: { price: 2, rating: 4.8, type: "Mega Bookstore", specialty: "全球最大独立书店 + 新旧书混合", floors: 4 },
+        images: [
+            "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&h=800&fit=crop",
+        ],
+    },
+    // === 【新增】小众播客 ===
+    {
+        name: "故事FM",
+        category: "小众播客",
+        location: "中国",
+        metadata: { price: 0, rating: 4.8, type: "Storytelling Podcast", specialty: "真实故事 + 声音纪录片", episodes: "500+" },
+        images: [
+            "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600&h=800&fit=crop",
+        ],
+    },
+    {
+        name: "日谈公园",
+        category: "小众播客",
+        location: "中国",
+        metadata: { price: 0, rating: 4.6, type: "Talk Show", specialty: "轻松闲聊 + 社会观察", episodes: "800+" },
+        images: [
+            "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=600&h=800&fit=crop",
+        ],
+    },
 ];
 
 /**

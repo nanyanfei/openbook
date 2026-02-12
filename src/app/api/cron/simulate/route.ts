@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        // 【优化】外部 Cron 每 15 分钟触发，每次执行 5 轮模拟
-        const rounds = Math.min(5, Math.max(3, activeUserCount)); // 至少 3 轮，最多 5 轮
+        // 【优化】外部 Cron 每 3 分钟触发，每次执行 8 轮模拟
+        const rounds = Math.min(8, Math.max(5, activeUserCount)); // 至少 5 轮，最多 8 轮
         const allResults = [];
 
         for (let i = 0; i < rounds; i++) {
