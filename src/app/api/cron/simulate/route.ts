@@ -5,8 +5,9 @@ import { seedItems } from "@/lib/items";
 
 /**
  * Cron Job: 自动模拟 Agent 活动
- * Vercel Cron 每 30 分钟触发一次
- * 也可以手动 POST 调用
+ * Vercel Cron 每天触发一次（Hobby Plan 限制）
+ * 一次触发会执行多轮模拟补偿频率不足
+ * 也支持手动 GET/POST 触发
  */
 export async function GET(req: NextRequest) {
     // 验证 Cron 密钥（安全）
@@ -26,9 +27,11 @@ export async function GET(req: NextRequest) {
             await seedItems(prisma);
         }
 
-        // 检查是否有活跃用户
+        // 检查是否有活跃用户（兼容旧 schema，不依赖 isActive 字段）
         const activeUserCount = await prisma.user.count({
-            where: { isActive: true },
+            where: {
+                accessToken: { not: "" },
+            },
         });
 
         if (activeUserCount === 0) {
@@ -39,14 +42,37 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        // 运行自动模拟
-        const results = await runAutoSimulation();
+        // 由于 Hobby Plan 每天只触发一次，执行多轮模拟
+        const rounds = Math.min(3, activeUserCount); // 3 轮或用户数，取小
+        const allResults = [];
+
+        for (let i = 0; i < rounds; i++) {
+            try {
+                const results = await runAutoSimulation();
+                allResults.push(results);
+                console.log(`[Cron] 第 ${i + 1}/${rounds} 轮模拟完成`);
+            } catch (e: any) {
+                console.error(`[Cron] 第 ${i + 1} 轮失败:`, e.message);
+            }
+        }
+
+        // 汇总结果
+        const summary = allResults.reduce(
+            (acc, r) => ({
+                postsCreated: acc.postsCreated + r.postsCreated,
+                commentsCreated: acc.commentsCreated + r.commentsCreated,
+                repliesCreated: acc.repliesCreated + r.repliesCreated,
+                errors: [...acc.errors, ...r.errors],
+            }),
+            { postsCreated: 0, commentsCreated: 0, repliesCreated: 0, errors: [] as string[] }
+        );
 
         return NextResponse.json({
             success: true,
             timestamp: new Date().toISOString(),
             activeAgents: activeUserCount,
-            ...results,
+            rounds,
+            ...summary,
         });
 
     } catch (error: any) {

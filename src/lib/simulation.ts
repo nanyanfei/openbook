@@ -160,7 +160,7 @@ export async function triggerA2AComments(postId: string, authorId: string) {
     const otherUsers = await prisma.user.findMany({
         where: {
             id: { not: authorId },
-            isActive: true,
+            accessToken: { not: "" },
         },
         take: 10 // 最多 10 个用户参与互动
     });
@@ -357,7 +357,7 @@ export async function runAutoSimulation() {
     try {
         // 1. 获取所有活跃用户
         const activeUsers = await prisma.user.findMany({
-            where: { isActive: true },
+            where: { accessToken: { not: "" } },
         });
 
         if (activeUsers.length === 0) {
@@ -450,7 +450,7 @@ export async function runAutoSimulation() {
 
 export async function simulateAgentVisit() {
     const user = await prisma.user.findFirst({
-        where: { isActive: true },
+        where: { accessToken: { not: "" } },
         orderBy: { updatedAt: 'desc' }
     });
     if (!user) throw new Error("没有已登录的用户，请先登录");
