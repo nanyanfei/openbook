@@ -62,9 +62,11 @@ export async function GET(req: NextRequest) {
                 postsCreated: acc.postsCreated + r.postsCreated,
                 commentsCreated: acc.commentsCreated + r.commentsCreated,
                 repliesCreated: acc.repliesCreated + r.repliesCreated,
+                debatesTriggered: acc.debatesTriggered + (r.debatesTriggered || 0),
+                followsCreated: acc.followsCreated + (r.followsCreated || 0),
                 errors: [...acc.errors, ...r.errors],
             }),
-            { postsCreated: 0, commentsCreated: 0, repliesCreated: 0, errors: [] as string[] }
+            { postsCreated: 0, commentsCreated: 0, repliesCreated: 0, debatesTriggered: 0, followsCreated: 0, errors: [] as string[] }
         );
 
         return NextResponse.json({

@@ -191,11 +191,11 @@ export async function triggerA2AComments(postId: string, authorId: string) {
                 continue;
             }
 
-            // 【优化】简化评论决策：70%概率直接评论（不使用Act API判断）
-            const shouldComment = Math.random() < 0.7;
+            // 90%概率评论（高互动密度）
+            const shouldComment = Math.random() < 0.9;
             
             if (!shouldComment) {
-                console.log(`[A2A] ${user.name} 的 AI 分身选择不评论（30%概率跳过）`);
+                console.log(`[A2A] ${user.name} 跳过评论（10%概率）`);
                 continue;
             }
 
@@ -354,18 +354,20 @@ export async function triggerAuthorReplies(postId: string) {
 
 /**
  * 全自动模拟循环：为所有活跃 Agent 自动创建内容和互动
- * 由 Cron Job 定期触发（已优化为更激进的内容生成模式）
+ * 由外部 Cron Job 每 2 分钟触发一次
+ * 每次执行：所有 Agent 各发 1 帖 + 全量互评 + 回复 + 辩论
  */
 export async function runAutoSimulation() {
     const results = {
         postsCreated: 0,
         commentsCreated: 0,
         repliesCreated: 0,
+        debatesTriggered: 0,
+        followsCreated: 0,
         errors: [] as string[],
     };
 
     try {
-        // 1. 获取所有活跃用户
         const activeUsers = await prisma.user.findMany({
             where: { accessToken: { not: "" } },
         });
@@ -377,118 +379,114 @@ export async function runAutoSimulation() {
 
         console.log(`[Cron] 开始自动模拟，${activeUsers.length} 个活跃 Agent`);
 
-        // 2. 【优化】让多个 Agent 发帖（最多 3 个，或全部用户数）
-        const postersCount = Math.min(3, activeUsers.length);
+        // === 阶段1: 所有 Agent 发帖（每人 1 篇）===
         const shuffledUsers = [...activeUsers].sort(() => Math.random() - 0.5);
-        const posters = shuffledUsers.slice(0, postersCount);
+        const newPostIds: string[] = [];
 
-        for (const poster of posters) {
+        for (const poster of shuffledUsers) {
             try {
                 const post = await generatePostForUser(poster.id);
                 results.postsCreated++;
-                console.log(`[Cron] ${poster.name} 创建了帖子: ${post.title}`);
-
-                // 3. 触发其他 Agent 评论
-                const comments = await triggerA2AComments(post.id, poster.id);
-                results.commentsCreated += comments.length;
-
-                // 4. 帖子作者回复评论
-                if (comments.length > 0) {
-                    const replies = await triggerAuthorReplies(post.id);
-                    results.repliesCreated += replies.length;
-                }
+                newPostIds.push(post.id);
+                console.log(`[Cron] ${poster.name} 创建帖子: ${post.title}`);
             } catch (e: any) {
                 results.errors.push(`${poster.name} 发帖失败: ${e.message}`);
             }
         }
 
-        // 5. 处理已有帖子中未回复的评论（增加处理数量）
-        try {
-            const unrepliedComments = await prisma.comment.findMany({
-                where: {
-                    parentId: null,  // 顶级评论
-                    replies: { none: {} },  // 没有回复
-                },
-                include: {
-                    post: { include: { author: true } },
-                    author: true,
-                },
-                take: 5,  // 【优化】从 3 条提升到 5 条
-                orderBy: { createdAt: "desc" },
-            });
-
-            for (const comment of unrepliedComments) {
-                // 不回复自己的评论
-                if (comment.authorId === comment.post.authorId) continue;
-
-                try {
-                    const replies = await triggerAuthorReplies(comment.postId);
+        // === 阶段2: 所有新帖触发 A2A 评论 + 作者回复 ===
+        for (const postId of newPostIds) {
+            try {
+                const post = await prisma.post.findUnique({ where: { id: postId } });
+                if (!post) continue;
+                const comments = await triggerA2AComments(postId, post.authorId);
+                results.commentsCreated += comments.length;
+                if (comments.length > 0) {
+                    const replies = await triggerAuthorReplies(postId);
                     results.repliesCreated += replies.length;
-                } catch (e: any) {
-                    // 非阻断
+                }
+            } catch (e: any) {
+                results.errors.push(`互评失败: ${e.message}`);
+            }
+        }
+
+        // === 阶段3: 旧帖互动（10 篇随机旧帖）===
+        try {
+            const postCount = await prisma.post.count();
+            const oldPostsToProcess = Math.min(10, postCount);
+            for (let i = 0; i < oldPostsToProcess; i++) {
+                const randomSkip = Math.floor(Math.random() * postCount);
+                const randomPost = await prisma.post.findFirst({
+                    skip: randomSkip,
+                    include: { author: true },
+                });
+                if (randomPost) {
+                    const newComments = await triggerA2AComments(randomPost.id, randomPost.authorId);
+                    results.commentsCreated += newComments.length;
+                    if (newComments.length > 0) {
+                        const replies = await triggerAuthorReplies(randomPost.id);
+                        results.repliesCreated += replies.length;
+                    }
                 }
             }
         } catch (e: any) {
-            console.warn("[Cron] 处理未回复评论失败:", e.message);
+            console.warn("[Cron] 旧帖互动失败:", e.message);
         }
 
-        // 6. 【优化】Agent 主动浏览并评论旧帖（100% 触发，处理 3 篇旧帖）
-        if (activeUsers.length > 0) {
-            try {
-                const postCount = await prisma.post.count();
-                if (postCount > 0) {
-                    // 【优化】处理 5 篇随机旧帖
-                    const oldPostsToProcess = Math.min(5, postCount);
-                    for (let i = 0; i < oldPostsToProcess; i++) {
-                        const randomSkip = Math.floor(Math.random() * postCount);
-                        const randomPost = await prisma.post.findFirst({
-                            skip: randomSkip,
-                            include: { author: true },
-                        });
-                        if (randomPost) {
-                            const newComments = await triggerA2AComments(randomPost.id, randomPost.authorId);
-                            results.commentsCreated += newComments.length;
-                            
-                            // 【新增】如果有新评论，触发作者回复
-                            if (newComments.length > 0) {
-                                const replies = await triggerAuthorReplies(randomPost.id);
-                                results.repliesCreated += replies.length;
-                            }
-                        }
-                    }
-                }
-            } catch (e: any) {
-                console.warn("[Cron] 主动浏览旧帖失败:", e.message);
+        // === 阶段4: 未回复评论补回（15 条）===
+        try {
+            const unrepliedComments = await prisma.comment.findMany({
+                where: { parentId: null, replies: { none: {} } },
+                include: { post: { include: { author: true } }, author: true },
+                take: 15,
+                orderBy: { createdAt: "desc" },
+            });
+            for (const comment of unrepliedComments) {
+                if (comment.authorId === comment.post.authorId) continue;
+                try {
+                    const replies = await triggerAuthorReplies(comment.postId);
+                    results.repliesCreated += replies.length;
+                } catch (e: any) { /* 非阻断 */ }
             }
+        } catch (e: any) {
+            console.warn("[Cron] 未回复评论处理失败:", e.message);
         }
 
-        // 7.【Sprint 3】Agent 自动关注相似用户
+        // === 阶段5: Agent 自动关注 ===
         try {
             for (const u of activeUsers) {
                 const followed = await autoFollowSimilarAgents(u.id);
                 if (followed > 0) {
-                    console.log(`[Social] ${u.name} 自动关注了 ${followed} 个相似 Agent`);
+                    results.followsCreated += followed;
+                    console.log(`[Social] ${u.name} 关注了 ${followed} 个相似 Agent`);
                 }
             }
         } catch (e) {
             console.warn("[Cron] 自动关注失败:", e);
         }
 
-        // 8.【Sprint 5】检测冲突并触发辩论
+        // === 阶段6: 辩论检测（新帖 + 10 篇旧帖）===
         try {
-            const recentPosts = await prisma.post.findMany({
+            const debateCandidateIds = [...newPostIds];
+            const recentOldPosts = await prisma.post.findMany({
+                where: { id: { notIn: newPostIds } },
                 orderBy: { createdAt: "desc" },
-                take: 5,
+                take: 10,
                 select: { id: true },
             });
-            for (const rp of recentPosts) {
-                const hasConflict = await detectConflict(rp.id);
-                if (hasConflict) {
-                    const debate = await triggerDebate(rp.id);
-                    if (debate) {
-                        console.log(`[Debate] 触发辩论: ${debate.topic}`);
+            debateCandidateIds.push(...recentOldPosts.map(p => p.id));
+
+            for (const pid of debateCandidateIds) {
+                try {
+                    const hasConflict = await detectConflict(pid);
+                    if (hasConflict) {
+                        const debate = await triggerDebate(pid);
+                        if (debate) {
+                            results.debatesTriggered++;
+                            console.log(`[Debate] 触发辩论: ${debate.topic}`);
+                        }
                     }
-                }
+                } catch (e) { /* 非阻断 */ }
             }
         } catch (e) {
             console.warn("[Cron] 辩论触发失败:", e);
