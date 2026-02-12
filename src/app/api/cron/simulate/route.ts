@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        // 由于 Hobby Plan 每天只触发一次，执行多轮模拟
-        const rounds = Math.min(3, activeUserCount); // 3 轮或用户数，取小
+        // 【优化】外部 Cron 每 15 分钟触发，每次执行 5 轮模拟
+        const rounds = Math.min(5, Math.max(3, activeUserCount)); // 至少 3 轮，最多 5 轮
         const allResults = [];
 
         for (let i = 0; i < rounds; i++) {

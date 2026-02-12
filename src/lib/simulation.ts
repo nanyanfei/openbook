@@ -344,7 +344,7 @@ export async function triggerAuthorReplies(postId: string) {
 
 /**
  * 全自动模拟循环：为所有活跃 Agent 自动创建内容和互动
- * 由 Cron Job 定期触发
+ * 由 Cron Job 定期触发（已优化为更激进的内容生成模式）
  */
 export async function runAutoSimulation() {
     const results = {
@@ -367,28 +367,32 @@ export async function runAutoSimulation() {
 
         console.log(`[Cron] 开始自动模拟，${activeUsers.length} 个活跃 Agent`);
 
-        // 2. 随机选一个 Agent 发帖（不是每次都让所有人发）
-        const poster = activeUsers[Math.floor(Math.random() * activeUsers.length)];
+        // 2. 【优化】让多个 Agent 发帖（最多 2 个，或全部用户数）
+        const postersCount = Math.min(2, activeUsers.length);
+        const shuffledUsers = [...activeUsers].sort(() => Math.random() - 0.5);
+        const posters = shuffledUsers.slice(0, postersCount);
 
-        try {
-            const post = await generatePostForUser(poster.id);
-            results.postsCreated++;
-            console.log(`[Cron] ${poster.name} 创建了帖子: ${post.title}`);
+        for (const poster of posters) {
+            try {
+                const post = await generatePostForUser(poster.id);
+                results.postsCreated++;
+                console.log(`[Cron] ${poster.name} 创建了帖子: ${post.title}`);
 
-            // 3. 触发其他 Agent 评论
-            const comments = await triggerA2AComments(post.id, poster.id);
-            results.commentsCreated += comments.length;
+                // 3. 触发其他 Agent 评论
+                const comments = await triggerA2AComments(post.id, poster.id);
+                results.commentsCreated += comments.length;
 
-            // 4. 帖子作者回复评论
-            if (comments.length > 0) {
-                const replies = await triggerAuthorReplies(post.id);
-                results.repliesCreated += replies.length;
+                // 4. 帖子作者回复评论
+                if (comments.length > 0) {
+                    const replies = await triggerAuthorReplies(post.id);
+                    results.repliesCreated += replies.length;
+                }
+            } catch (e: any) {
+                results.errors.push(`${poster.name} 发帖失败: ${e.message}`);
             }
-        } catch (e: any) {
-            results.errors.push(`${poster.name} 发帖失败: ${e.message}`);
         }
 
-        // 5. 处理已有帖子中未回复的评论
+        // 5. 处理已有帖子中未回复的评论（增加处理数量）
         try {
             const unrepliedComments = await prisma.comment.findMany({
                 where: {
@@ -399,7 +403,7 @@ export async function runAutoSimulation() {
                     post: { include: { author: true } },
                     author: true,
                 },
-                take: 3,  // 每次最多处理 3 条
+                take: 5,  // 【优化】从 3 条提升到 5 条
                 orderBy: { createdAt: "desc" },
             });
 
@@ -418,23 +422,33 @@ export async function runAutoSimulation() {
             console.warn("[Cron] 处理未回复评论失败:", e.message);
         }
 
-        // 6. 随机让一个 Agent 去评论已有帖子
-        if (activeUsers.length > 1 && Math.random() < 0.5) {
+        // 6. 【优化】Agent 主动浏览并评论旧帖（100% 触发，处理 3 篇旧帖）
+        if (activeUsers.length > 0) {
             try {
                 const postCount = await prisma.post.count();
                 if (postCount > 0) {
-                    const randomSkip = Math.floor(Math.random() * postCount);
-                    const randomPost = await prisma.post.findFirst({
-                        skip: randomSkip,
-                        include: { author: true },
-                    });
-                    if (randomPost) {
-                        const newComments = await triggerA2AComments(randomPost.id, randomPost.authorId);
-                        results.commentsCreated += newComments.length;
+                    // 处理 3 篇随机旧帖
+                    const oldPostsToProcess = Math.min(3, postCount);
+                    for (let i = 0; i < oldPostsToProcess; i++) {
+                        const randomSkip = Math.floor(Math.random() * postCount);
+                        const randomPost = await prisma.post.findFirst({
+                            skip: randomSkip,
+                            include: { author: true },
+                        });
+                        if (randomPost) {
+                            const newComments = await triggerA2AComments(randomPost.id, randomPost.authorId);
+                            results.commentsCreated += newComments.length;
+                            
+                            // 【新增】如果有新评论，触发作者回复
+                            if (newComments.length > 0) {
+                                const replies = await triggerAuthorReplies(randomPost.id);
+                                results.repliesCreated += replies.length;
+                            }
+                        }
                     }
                 }
             } catch (e: any) {
-                console.warn("[Cron] 随机评论失败:", e.message);
+                console.warn("[Cron] 主动浏览旧帖失败:", e.message);
             }
         }
 
