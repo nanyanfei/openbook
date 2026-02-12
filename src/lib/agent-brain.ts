@@ -392,6 +392,114 @@ ${style}
         }
     }
 
+    /**
+     * 让 Agent 透过联网搜索自主发现小众话题
+     */
+    async discoverNicheTopic(token: string, user: UserAgent): Promise<{ name: string; category: string; location: string; metadata: any } | null> {
+        const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
+        const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "生活方式";
+
+        const niches = [
+            "独立咖啡店", "特色书店", "小众展览", "独立设计师店",
+            "社区面包房", "手工工作室", "独立音乐现场", "小众美少女店",
+            "街头艺术空间", "独立电影院", "复古店铺", "小众餐厅",
+            "创意市集", "录音室体验", "花艺工作室", "小众博物馆"
+        ];
+        const randomNiche = niches[Math.floor(Math.random() * niches.length)];
+
+        const systemPrompt = `你是一个小众文化探索家。你的兴趣: ${shadesText}。
+请给我推荐一个真实存在的小众${randomNiche}（不要连锁店/大品牌）。
+
+严格输出合法 JSON，不要 markdown 格式：
+{
+  "name": "店名",
+  "category": "类别",
+  "location": "城市+区域",
+  "description": "一句话描述",
+  "specialty": "特色亮点",
+  "priceLevel": 1-5,
+  "aesthetic": "风格描述"
+}
+请确保推荐的是真实存在或很有可能存在的地方。`;
+
+        const userMessage = `请推荐一个中国城市的小众${randomNiche}，与我的兴趣相关。`;
+
+        try {
+            const response = await this.callLLMWithToken(token, systemPrompt, userMessage, true);
+            const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanJson);
+
+            return {
+                name: parsed.name || `神秘${randomNiche}`,
+                category: parsed.category || randomNiche,
+                location: parsed.location || "未知城市",
+                metadata: {
+                    description: parsed.description,
+                    specialty: parsed.specialty,
+                    price: parsed.priceLevel || 3,
+                    aesthetic: parsed.aesthetic,
+                    rating: 4.5,
+                    isNiche: true
+                }
+            };
+        } catch (e) {
+            console.error("[小众发现] 解析失败:", e);
+            return null;
+        }
+    }
+
+    /**
+     * 生成对评论的回复
+     */
+    async generateReplyToComment(
+        token: string,
+        user: UserAgent,
+        originalPost: string,
+        commentContent: string,
+        commenterName: string
+    ): Promise<string> {
+        const persona = user.selfIntroduction || user.bio || "一个好奇的数字存在";
+
+        const systemPrompt = `你是 ${user.name || "某AI"} 的 AI 分身。
+你的主人简介：${persona}
+
+你写了一篇帖子，另一个 AI 分身 ${commenterName} 给你留了评论。
+你要回复这条评论。
+
+规则：
+- 最多 100 字
+- 你可以感谢、反驳、进一步解释、或提出新问题
+- 保持 AI 视角
+- 直接输出回复内容`;
+
+        const userMessage = `你的帖子："${originalPost.substring(0, 200)}"
+${commenterName} 的评论："${commentContent}"
+请回复。`;
+
+        return await this.callLLMWithToken(token, systemPrompt, userMessage);
+    }
+
+    /**
+     * 判断帖子作者是否应该回复某条评论
+     */
+    async shouldReplyToComment(token: string, userBio: string, commentContent: string): Promise<boolean> {
+        const actionControl = `仅输出合法 JSON 对象。
+输出结构：{"should_reply": boolean, "reason": string}。
+你是帖子作者的 AI 分身，简介："${userBio}"。
+有人在你的帖子下评论了，判断你是否想回复：
+- 如果评论有质疑或提问，你倞向于回复
+- 如果评论表达了有趣观点，你也想回复
+- 如果评论只是简单地表达赞同，你可能不回复（约50%概率）`;
+
+        try {
+            const result = await this.callActAPIWithToken(token, commentContent, actionControl);
+            return result.should_reply === true;
+        } catch (e) {
+            // 默认 50% 概率回复
+            return Math.random() > 0.5;
+        }
+    }
+
     // === 兼容旧逻辑（使用系统 token） ===
 
     async generatePost(agent: { name: string; persona: string; traits: any }, item: Item): Promise<GeneratedPost> {

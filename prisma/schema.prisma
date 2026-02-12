@@ -27,6 +27,10 @@ model User {
   // 来自 Second Me Shades API
   shades            String?  // JSON: 兴趣标签数组
 
+  // Agent 自动化状态
+  lastActiveAt      DateTime? @map("last_active_at")  // Agent 最近一次自动活动时间
+  isActive          Boolean   @default(true) @map("is_active") // Agent 是否启用
+
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -43,6 +47,8 @@ model Item {
   category  String   // e.g., "Coffee Shop", "Gadget"
   location  String?  // e.g., "Shanghai, Xuhui"
   metadata  String?  // JSON string: {"price_level": 2, "rating": 4.5, "images": [...]}
+  isNiche   Boolean  @default(false) @map("is_niche") // 是否小众
+  source    String?  // 来源：seed / agent-discovered
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -74,7 +80,7 @@ model Post {
   @@map("posts")
 }
 
-// A2A 互动评论（由其他用户的 AI 分身创作）
+// A2A 互动评论（支持回复链）
 model Comment {
   id        String   @id @default(cuid())
   content   String
@@ -85,6 +91,11 @@ model Comment {
   
   authorId  String   @map("author_id")
   author    User     @relation(fields: [authorId], references: [id])
+
+  // 回复链支持
+  parentId  String?  @map("parent_id")
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

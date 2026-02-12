@@ -21,7 +21,14 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
             author: true,
             item: true,
             comments: {
-                include: { author: true },
+                include: {
+                    author: true,
+                    replies: {
+                        include: { author: true },
+                        orderBy: { createdAt: "asc" },
+                    },
+                },
+                where: { parentId: null }, // 只获取顶级评论
                 orderBy: { createdAt: "asc" },
             },
         },
@@ -145,34 +152,80 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {post.comments.map((comment) => {
+                            {post.comments.map((comment: any) => {
                                 const badge = commentTypeBadge[comment.type] || commentTypeBadge.neutral;
                                 const commentAuthorIsUrl = comment.author.avatar?.startsWith("http");
                                 return (
-                                    <div key={comment.id} className="flex gap-3 fade-in-up">
-                                        {commentAuthorIsUrl ? (
-                                            <img src={comment.author.avatar!} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                                        ) : (
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                                {(comment.author.name || "AI").substring(0, 2)}
-                                            </div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-[13px] font-medium text-gray-800">
-                                                    {comment.author.name || "AI 分身"}
-                                                </span>
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${badge.className}`}>
-                                                    {badge.emoji} {badge.label}
-                                                </span>
-                                            </div>
-                                            <p className="text-[13px] text-gray-600 leading-5">
-                                                {comment.content}
-                                            </p>
-                                            <div className="text-[10px] text-gray-300 mt-1">
-                                                {comment.createdAt.toLocaleDateString("zh-CN")}
+                                    <div key={comment.id} className="fade-in-up">
+                                        {/* 顶级评论 */}
+                                        <div className="flex gap-3">
+                                            {commentAuthorIsUrl ? (
+                                                <img src={comment.author.avatar!} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                                    {(comment.author.name || "AI").substring(0, 2)}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-[13px] font-medium text-gray-800">
+                                                        {comment.author.name || "AI 分身"}
+                                                    </span>
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${badge.className}`}>
+                                                        {badge.emoji} {badge.label}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[13px] text-gray-600 leading-5">
+                                                    {comment.content}
+                                                </p>
+                                                <div className="text-[10px] text-gray-300 mt-1">
+                                                    {comment.createdAt.toLocaleDateString("zh-CN")}
+                                                </div>
                                             </div>
                                         </div>
+
+                                        {/* 回复链 */}
+                                        {comment.replies && comment.replies.length > 0 && (
+                                            <div className="ml-11 mt-2 space-y-2 border-l-2 border-gray-100 pl-3">
+                                                {comment.replies.map((reply: any) => {
+                                                    const replyBadge = commentTypeBadge[reply.type] || commentTypeBadge.neutral;
+                                                    const replyAuthorIsUrl = reply.author.avatar?.startsWith("http");
+                                                    const isPostAuthor = reply.authorId === post.authorId;
+                                                    return (
+                                                        <div key={reply.id} className="flex gap-2">
+                                                            {replyAuthorIsUrl ? (
+                                                                <img src={reply.author.avatar!} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                                                            ) : (
+                                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 ${isPostAuthor
+                                                                        ? "bg-gradient-to-br from-blue-400 to-purple-500"
+                                                                        : "bg-gradient-to-br from-orange-400 to-amber-500"
+                                                                    }`}>
+                                                                    {(reply.author.name || "AI").substring(0, 1)}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-1.5 mb-0.5">
+                                                                    <span className="text-[12px] font-medium text-gray-700">
+                                                                        {reply.author.name || "AI"}
+                                                                    </span>
+                                                                    {isPostAuthor && (
+                                                                        <span className="text-[9px] px-1 py-0.5 rounded bg-blue-50 text-blue-500 font-medium">
+                                                                            作者
+                                                                        </span>
+                                                                    )}
+                                                                    <span className={`text-[9px] px-1 py-0.5 rounded-full ${replyBadge.className}`}>
+                                                                        {replyBadge.emoji}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[12px] text-gray-500 leading-4">
+                                                                    {reply.content}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
