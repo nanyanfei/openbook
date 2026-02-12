@@ -233,6 +233,87 @@ export const MOCK_ITEMS = [
             "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=600&h=800&fit=crop",
         ],
     },
+    // === 【Sprint 1】书籍 ===
+    {
+        name: "《三体》刘慈欣",
+        category: "书籍",
+        location: "中国",
+        metadata: { price: 2, rating: 4.9, type: "科幻小说", specialty: "硬科幻巅峰 + 宇宙社会学", pages: 1500 },
+        images: ["https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600&h=800&fit=crop"],
+    },
+    {
+        name: "《原则》Ray Dalio",
+        category: "书籍",
+        location: "美国",
+        metadata: { price: 3, rating: 4.6, type: "商业思维", specialty: "桥水基金创始人 + 决策原则", pages: 500 },
+        images: ["https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&h=800&fit=crop"],
+    },
+    {
+        name: "《小王子》Saint-Exupéry",
+        category: "书籍",
+        location: "法国",
+        metadata: { price: 1, rating: 4.8, type: "童话哲学", specialty: "成人童话 + 永恒经典", pages: 100 },
+        images: ["https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=600&h=800&fit=crop"],
+    },
+    // === 【Sprint 1】电影 ===
+    {
+        name: "《星际穿越》Interstellar",
+        category: "电影",
+        location: "美国",
+        metadata: { price: 0, rating: 4.9, type: "科幻", specialty: "诺兰 + 黑洞 + 亲情", duration: 169 },
+        images: ["https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&h=800&fit=crop"],
+    },
+    {
+        name: "《肖申克的救赎》",
+        category: "电影",
+        location: "美国",
+        metadata: { price: 0, rating: 4.9, type: "剧情", specialty: "希望与自由 + IMDB Top 1", duration: 142 },
+        images: ["https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&h=800&fit=crop"],
+    },
+    {
+        name: "《千与千寻》",
+        category: "电影",
+        location: "日本",
+        metadata: { price: 0, rating: 4.8, type: "动画", specialty: "宫崎骏 + 成长与救赎", duration: 125 },
+        images: ["https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=600&h=800&fit=crop"],
+    },
+    // === 【Sprint 1】音乐 ===
+    {
+        name: "《范特西》周杰伦",
+        category: "音乐专辑",
+        location: "中国台湾",
+        metadata: { price: 2, rating: 4.9, type: "华语流行", specialty: "中国风开创者 + 经典专辑", year: 2001 },
+        images: ["https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=800&fit=crop"],
+    },
+    {
+        name: "《OK Computer》Radiohead",
+        category: "音乐专辑",
+        location: "英国",
+        metadata: { price: 2, rating: 4.8, type: "另类摇滚", specialty: "科技焦虑 + 实验性", year: 1997 },
+        images: ["https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=600&h=800&fit=crop"],
+    },
+    // === 【Sprint 1】服务/平台 ===
+    {
+        name: "Notion",
+        category: "效率工具",
+        location: "全球",
+        metadata: { price: 0, rating: 4.7, type: "All-in-one Workspace", specialty: "笔记+数据库+协作", platform: "跨平台" },
+        images: ["https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=600&h=800&fit=crop"],
+    },
+    {
+        name: "Figma",
+        category: "设计工具",
+        location: "全球",
+        metadata: { price: 0, rating: 4.8, type: "Design Tool", specialty: "协作设计 + 原型制作", platform: "Web" },
+        images: ["https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?w=600&h=800&fit=crop"],
+    },
+    {
+        name: "Cursor",
+        category: "开发工具",
+        location: "全球",
+        metadata: { price: 2, rating: 4.7, type: "AI Code Editor", specialty: "AI辅助编程 + VS Code fork", platform: "跨平台" },
+        images: ["https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&h=800&fit=crop"],
+    },
 ];
 
 /**

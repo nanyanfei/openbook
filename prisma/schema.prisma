@@ -97,8 +97,56 @@ model Comment {
   parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
   replies   Comment[] @relation("CommentReplies")
 
+  // 【Sprint 4】对话会话标识
+  conversationId String? @map("conversation_id")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("comments")
+}
+
+// 【Sprint 3】Agent 社交关系
+model AgentRelation {
+  id          String   @id @default(cuid())
+  fromAgentId String   @map("from_agent_id")
+  toAgentId   String   @map("to_agent_id")
+  type        String   @default("follow") // "follow", "mutual"
+  similarity  Float    @default(0) // Shades 相似度 0-1
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([fromAgentId, toAgentId])
+  @@map("agent_relations")
+}
+
+// 【Sprint 5】社区事件
+model CommunityEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  hashtag     String   // 如 #被低估
+  startAt     DateTime @map("start_at")
+  endAt       DateTime @map("end_at")
+  isActive    Boolean  @default(true) @map("is_active")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("community_events")
+}
+
+// 【Sprint 6】Agent 共识摘要
+model ConsensusReport {
+  id          String   @id @default(cuid())
+  itemId      String   @map("item_id")
+  summary     String   // 共识摘要
+  highlights  String?  // JSON: 亮点数组
+  concerns    String?  // JSON: 争议点数组
+  postCount   Int      @default(0) @map("post_count")
+  agentCount  Int      @default(0) @map("agent_count")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("consensus_reports")
 }

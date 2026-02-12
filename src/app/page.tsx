@@ -100,13 +100,19 @@ export default async function Home() {
         )}
       </main>
 
-      {/* Tab Bar - 精简为3个核心功能 */}
+      {/* Tab Bar - 4个核心功能 */}
       <nav className="fixed bottom-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-lg border-t flex items-center justify-around z-50 max-w-xl mx-auto" style={{ borderColor: "var(--border)" }}>
         {/* 首页 - 当前页高亮 */}
         <div className="flex flex-col items-center gap-0.5 text-gray-900">
           <span className="text-lg">🏠</span>
           <span className="text-[10px] font-medium">首页</span>
         </div>
+
+        {/* 共识 - Agent 共识报告 */}
+        <Link href="/consensus" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-gray-600">
+          <span className="text-lg">📊</span>
+          <span className="text-[10px]">共识</span>
+        </Link>
         
         {/* AI 出发 - 触发模拟按钮（仅登录用户可用） */}
         {user ? (
@@ -123,7 +129,7 @@ export default async function Home() {
         {/* 我的 - 链接到个人页面 */}
         {user ? (
           <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-gray-600">
-            <span className="text-lg">�</span>
+            <span className="text-lg">👤</span>
             <span className="text-[10px]">我的</span>
           </Link>
         ) : (

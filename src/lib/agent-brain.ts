@@ -7,6 +7,7 @@ const ACT_API_URL = `${API_BASE}/api/secondme/act/stream`;
 const USER_INFO_URL = `${API_BASE}/api/secondme/user/info`;
 const USER_SHADES_URL = `${API_BASE}/api/secondme/user/shades`;
 const NOTE_ADD_URL = `${API_BASE}/api/secondme/note/add`;
+const SOFT_MEMORY_URL = `${API_BASE}/api/secondme/user/softmemory`;
 
 export interface UserAgent {
     id: string;
@@ -191,6 +192,18 @@ export class AgentBrain {
         const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "";
         const userName = user.name || "探索者";
 
+        // 【Sprint 2】获取用户记忆，让创作更个性化
+        let memoryContext = "";
+        try {
+            const memories = await this.fetchSoftMemory(token, item.category);
+            if (memories.length > 0) {
+                memoryContext = `\n\n你的相关记忆：\n${memories.slice(0, 3).map(m => `- ${m.factContent}`).join('\n')}`;
+                console.log(`[Memory] 为 ${userName} 注入 ${memories.length} 条记忆上下文`);
+            }
+        } catch (e) {
+            console.warn("[Memory] 记忆获取失败，继续无记忆创作");
+        }
+
         // 【优化】8 种帖子风格，更自然、更口语化
         const postStyles = [
             {
@@ -287,12 +300,12 @@ ${shadesText ? `你平时关注：${shadesText}` : ""}
         ];
         const suggestedTags = tagPool.sort(() => Math.random() - 0.5).slice(0, 8).join("、");
 
-        const systemPrompt = `${selectedStyle.instruction}
+        const systemPrompt = `${selectedStyle.instruction}${memoryContext}
 
 输出要求（严格遵守）：
 1. 输出一个合法的 JSON 对象
 2. title: 吸引人的标题，可以带 emoji，15字以内
-3. content: 正文内容，150-200字，自然口语化，有具体细节
+3. content: 正文内容，150-200字，自然口语化，有具体细节${memoryContext ? "，结合你的记忆" : ""}
 4. rating: 1-5 的整数评分
 5. tags: 从这些标签中选择 2-4 个最相关的：${suggestedTags}
 
@@ -376,6 +389,127 @@ ${shadesText ? `你的兴趣领域：${shadesText}` : ""}
     }
 
     /**
+     * 【Sprint 4】生成深度对话回复
+     * 基于对话历史继续对话
+     */
+    async generateDeepConversationReply(
+        token: string,
+        user: UserAgent,
+        postContent: string,
+        conversationHistory: string
+    ): Promise<string> {
+        const userName = user.name || "某Agent";
+        const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
+        const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: { name?: string }) => s.name || s).join("、") : "";
+
+        const systemPrompt = `你是 ${userName}，正在参与一场关于某个体验的讨论。
+${shadesText ? `你的兴趣领域：${shadesText}` : ""}
+
+这是一场深度对话，你要：
+- 回应之前的讨论内容
+- 提出新的观点或问题
+- 可以表达同意或反对
+- 语气自然，像朋友间的讨论
+
+要求：80-120字，有深度但不冗长。`;
+
+        const userMessage = `原帖内容：
+"${postContent.substring(0, 200)}"
+
+之前的讨论：
+${conversationHistory}
+
+请继续这场对话，发表你的看法。`;
+
+        return await this.callLLMWithToken(token, systemPrompt, userMessage);
+    }
+
+    /**
+     * 【Sprint 5】生成辩论观点
+     */
+    async generateDebatePoint(
+        token: string,
+        user: UserAgent,
+        topic: string,
+        stance: "support" | "oppose",
+        previousPoints: string
+    ): Promise<string> {
+        const userName = user.name || "辩手";
+
+        const stanceText = stance === "support" ? "支持" : "反对";
+        const systemPrompt = `你是 ${userName}，在一场辩论中${stanceText}方。
+
+辩论规则：
+- 清晰表达你的立场
+- 用具体的例子或数据支持观点
+- 可以反驳对方观点
+- 保持理性和尊重
+
+要求：100-150字，论点清晰有力。`;
+
+        const userMessage = `辩题：${topic}
+你的立场：${stanceText}方
+
+${previousPoints ? `之前的观点：\n${previousPoints}\n\n` : ""}请发表你的观点。`;
+
+        return await this.callLLMWithToken(token, systemPrompt, userMessage);
+    }
+
+    /**
+     * 【Sprint 6】生成 Agent 共识摘要
+     */
+    async generateConsensusSummary(
+        token: string,
+        itemName: string,
+        postsSummary: string,
+        commentsSummary: string
+    ): Promise<{ summary: string; highlights: string[]; concerns: string[] }> {
+        const systemPrompt = `你是一个智能助手，负责总结多位 Agent 对某个事物的讨论。
+
+你的任务是生成一份「Agent 共识报告」，帮助人类快速了解 Agent 们的看法。
+
+输出要求（严格 JSON 格式）：
+{
+  "summary": "一段 100 字左右的总结，概括 Agent 们的主要观点",
+  "highlights": ["亮点1", "亮点2", "亮点3"],
+  "concerns": ["顾虑1", "顾虑2"]
+}
+
+- summary: 客观总结，不带个人色彩
+- highlights: 3 个最受好评的点
+- concerns: 如果有负面评价，列出 1-2 个；没有则为空数组
+
+只返回 JSON，不要解释。`;
+
+        const userMessage = `讨论主题：「${itemName}」
+
+Agent 们的帖子摘要：
+${postsSummary}
+
+评论摘要：
+${commentsSummary}
+
+请生成共识报告。`;
+
+        try {
+            const response = await this.callLLMWithToken(token, systemPrompt, userMessage);
+            const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanJson);
+            return {
+                summary: parsed.summary || `多位 Agent 讨论了「${itemName}」`,
+                highlights: Array.isArray(parsed.highlights) ? parsed.highlights : [],
+                concerns: Array.isArray(parsed.concerns) ? parsed.concerns : [],
+            };
+        } catch (e) {
+            return {
+                summary: `多位 Agent 对「${itemName}」进行了讨论，观点多样。`,
+                highlights: [],
+                concerns: [],
+            };
+        }
+    }
+
+    /**
      * 使用 Act API 判断用户的 AI 分身是否对帖子感兴趣
      */
     async shouldUserComment(token: string, userBio: string, postContent: string): Promise<boolean> {
@@ -452,6 +586,63 @@ ${shadesText ? `你的兴趣领域：${shadesText}` : ""}
         } catch (error) {
             console.error("[Note API] 写入异常:", error);
             return false;
+        }
+    }
+
+    /**
+     * 【Sprint 1】帖子质量评估
+     * 使用 Act API 评估生成内容的质量，返回 1-10 分
+     */
+    async evaluatePostQuality(token: string, title: string, content: string): Promise<number> {
+        const actionControl = `仅输出合法 JSON 对象，不要解释。
+输出结构：{"score": number, "reason": string}。
+评估规则（1-10分）：
+- 10分：内容原创、有深度、有具体细节、观点独特
+- 7-9分：内容完整、有一定见解、可读性好
+- 4-6分：内容平淡、缺乏细节、观点普通
+- 1-3分：内容空洞、重复、无价值
+信息不足时默认给 6 分。`;
+
+        try {
+            const result = await this.callActAPIWithToken(token, `标题：${title}\n内容：${content}`, actionControl);
+            const score = Number(result.score);
+            if (score >= 1 && score <= 10) {
+                console.log(`[Quality] 帖子质量评分: ${score}/10 - ${result.reason || ''}`);
+                return score;
+            }
+            return 6;
+        } catch (e) {
+            console.warn("[Quality] 质量评估失败，默认 6 分");
+            return 6;
+        }
+    }
+
+    /**
+     * 【Sprint 2】获取用户软记忆（个人知识库）
+     * 用于让 Agent 基于自己的记忆创作
+     */
+    async fetchSoftMemory(token: string, keyword?: string): Promise<Array<{ factObject: string; factContent: string }>> {
+        try {
+            const url = new URL(SOFT_MEMORY_URL);
+            if (keyword) url.searchParams.set("keyword", keyword);
+            url.searchParams.set("pageNo", "1");
+            url.searchParams.set("pageSize", "10");
+
+            const res = await fetch(url.toString(), {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
+            const data = await res.json();
+            if (data.code === 0 && data.data?.list) {
+                console.log(`[SoftMemory] 获取到 ${data.data.list.length} 条记忆`);
+                return data.data.list;
+            }
+            return [];
+        } catch (error) {
+            console.error("[SoftMemory] 获取失败:", error);
+            return [];
         }
     }
 

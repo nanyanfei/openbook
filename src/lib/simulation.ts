@@ -115,6 +115,13 @@ export async function generatePostForUser(userId: string) {
 
     const generatedPost = await brain.generatePostForUser(token, userAgent, itemForBrain);
 
+    // 【Sprint 1】质量过滤：评估帖子质量，低于 5 分则丢弃
+    const qualityScore = await brain.evaluatePostQuality(token, generatedPost.title, generatedPost.content);
+    if (qualityScore < 5) {
+        console.log(`[Quality] 帖子质量过低 (${qualityScore}/10)，丢弃: ${generatedPost.title}`);
+        throw new Error(`帖子质量过低 (${qualityScore}/10)`);
+    }
+
     // 获取图片配置（存储配置对象，前端动态获取图片）
     const imageConfig = getImageConfig(item.name, item.category);
 
