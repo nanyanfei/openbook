@@ -10,17 +10,11 @@ interface DynamicImageProps {
     index?: number; // 用于生成不同的随机种子
 }
 
-// 简单的伪随机数生成器（基于seed），确保SSR和客户端结果一致
-function seededRandom(seed: number): number {
-    const x = Math.sin(seed++) * 10000;
-    return x - Math.floor(x);
-}
-
 /**
  * 动态图片组件
  * 【优化】根据配置动态生成图片URL，确保每个帖子显示独特的图片
  * - 固定配置：从预设URL中随机选择
- * - 动态配置：使用Unsplash Source API根据关键词实时获取
+ * - 动态配置：使用 picsum.photos 根据 seed 获取图片
  */
 export const DynamicImage: React.FC<DynamicImageProps> = ({ 
     config, 
@@ -30,8 +24,6 @@ export const DynamicImage: React.FC<DynamicImageProps> = ({
     index = 0
 }) => {
     const [retryCount, setRetryCount] = useState(0);
-    // 使用 useState lazy initializer 生成稳定的种子值
-    const [seed] = useState(() => Date.now() + index);
     
     const imageUrl = useMemo(() => {
         try {
@@ -44,13 +36,14 @@ export const DynamicImage: React.FC<DynamicImageProps> = ({
             }
             
             if (parsed.type === "dynamic" && parsed.keywords) {
-                // 动态图片：使用seed-based随机数确保稳定性
-                const randomSeed = Math.floor(seededRandom(seed + retryCount) * 100000);
-                const uniqueId = `${seed}-${randomSeed}-${retryCount}-${index}`;
+                // 动态图片：使用 picsum.photos 替代已弃用的 source.unsplash.com
+                // 使用 keywords 生成 seed 确保相同主题的图片有一定相关性
+                const seed = `${parsed.keywords}-${index}-${retryCount}`;
                 const width = parsed.width || 600;
                 const height = parsed.height || 800;
                 
-                return `https://source.unsplash.com/${width}x${height}/?${encodeURIComponent(parsed.keywords)}&sig=${uniqueId}`;
+                // picsum.photos 基于 seed 返回确定性图片，同时支持随机
+                return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${width}/${height}`;
             }
             
             // 配置解析失败时的fallback
@@ -59,7 +52,7 @@ export const DynamicImage: React.FC<DynamicImageProps> = ({
             // JSON解析失败时的fallback
             return `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`;
         }
-    }, [config, retryCount, index, seed]);
+    }, [config, retryCount, index]);
     
     const handleError = () => {
         if (retryCount < 3) {
