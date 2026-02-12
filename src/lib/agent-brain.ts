@@ -399,33 +399,44 @@ ${style}
         const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
         const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "生活方式";
 
-        // 50+ 小众品类，涵盖线下空间、独立产品、数字科技、文化体验、生活方式
+        // 50+ 小众品类，优化权重分布（减少线下空间，增加数字/产品类）
         const niches = [
-            // 线下空间类 (20)
-            "独立咖啡店", "特色书店", "小众展览", "独立设计师店",
-            "社区面包房", "手工工作室", "独立音乐现场", "街头艺术空间",
-            "独立电影院", "复古店铺", "小众餐厅", "创意市集",
-            "花艺工作室", "小众博物馆", "独立酒吧", "胶片冲洗店",
-            "黑胶唱片店", "古着店", "社区图书馆", "独立剧场",
-            // 独立产品/品牌类 (12)
+            // 【优化】线下空间类减至 10 个（原为 20 个）
+            "独立咖啡店", "特色书店", "独立音乐现场", "街头艺术空间",
+            "复古店铺", "小众餐厅", "黑胶唱片店", "社区图书馆",
+            "独立剧场", "小众博物馆",
+            // 【优化】独立产品/品牌类增至 15 个
             "小众香水品牌", "独立手表品牌", "小众文具品牌", "独立护肤品牌",
             "手工皮具品牌", "独立珠宝设计师", "小众耳机品牌", "独立家居品牌",
             "手工蜡烛品牌", "独立眼镜品牌", "小众背包品牌", "独立陶瓷工作室",
-            // 数字/科技类 (10)
+            "小众自行车品牌", "独立香氛品牌", "手工银饰品牌",
+            // 【优化】数字/科技类增至 15 个
             "独立App", "小众开源工具", "独立游戏", "小众播客",
             "独立音乐人作品", "小众字体设计", "独立开发者产品", "小众浏览器插件",
-            "数字艺术平台", "独立电子杂志",
-            // 文化/体验类 (10)
+            "数字艺术平台", "独立电子杂志", "小众AI工具", "独立笔记软件",
+            "小众设计工具", "独立阅读器", "小众日历工具",
+            // 【优化】文化/体验类增至 12 个
             "小众纪录片", "独立出版物Zine", "地下音乐厂牌", "独立动画工作室",
             "小众桌游", "独立漫画", "城市探险路线", "小众旅行目的地",
-            "独立摄影展", "实验音乐现场",
-            // 生活方式类 (8)
+            "独立摄影展", "实验音乐现场", "独立戏剧团体", "小众舞蹈工作室",
+            // 【优化】生活方式类增至 10 个
             "小众运动场馆", "独立农场市集", "城市骑行路线", "小众露营地",
-            "独立瑜伽工作室", "小众茶馆", "独立花店", "社区共享厨房"
+            "独立瑜伽工作室", "小众茶馆", "独立花店", "社区共享厨房",
+            "小众疗愈空间", "手工造纸工坊"
         ];
         const randomNiche = niches[Math.floor(Math.random() * niches.length)];
 
-        // 全球小众文化城市池
+        // 判断是否为数字/虚拟产品（不需要地理位置）
+        const isDigitalProduct = [
+            "独立App", "小众开源工具", "独立游戏", "小众播客",
+            "独立音乐人作品", "小众字体设计", "独立开发者产品", "小众浏览器插件",
+            "数字艺术平台", "独立电子杂志", "小众AI工具", "独立笔记软件",
+            "小众设计工具", "独立阅读器", "小众日历工具",
+            "小众纪录片", "独立出版物Zine", "地下音乐厂牌", "独立动画工作室",
+            "小众桌游", "独立漫画"
+        ].includes(randomNiche);
+
+        // 全球小众文化城市池（仅用于线下实体类）
         const cities = [
             "上海", "北京", "成都", "杭州", "深圳", "广州", "南京", "苏州", "厦门", "长沙",
             "东京", "京都", "大阪", "首尔", "台北", "香港", "新加坡", "曼谷", "清迈",
@@ -434,7 +445,31 @@ ${style}
         ];
         const randomCity = cities[Math.floor(Math.random() * cities.length)];
 
-        const systemPrompt = `你是一个小众文化探索家。你的兴趣: ${shadesText}。
+        // 【优化】根据品类类型使用不同的prompt
+        let systemPrompt: string;
+        let userMessage: string;
+
+        if (isDigitalProduct) {
+            // 数字/虚拟产品类的prompt
+            systemPrompt = `你是一个小众文化探索家，擅长发现独特的数字产品和虚拟体验。你的兴趣: ${shadesText}。
+请给我推荐一个真实存在的${randomNiche}（不要大厂产品/不要微软/苹果/谷歌等大企业的产品）。
+
+严格输出合法 JSON，不要 markdown 格式：
+{
+  "name": "产品/作品名称",
+  "category": "类别",
+  "platform": "适用平台/渠道",
+  "description": "一句话描述核心功能/特色",
+  "specialty": "独特亮点（为什么推荐）",
+  "priceLevel": 0-5,
+  "aesthetic": "风格/体验描述"
+}
+请确保推荐的是真实存在的小众事物。`;
+
+            userMessage = `请推荐一个${randomNiche}，与我的兴趣相关。可以是独立开发者作品、小众创作者作品等。`;
+        } else {
+            // 线下实体/品牌类的prompt
+            systemPrompt = `你是一个小众文化探索家。你的兴趣: ${shadesText}。
 请给我推荐一个真实存在的小众${randomNiche}（不要连锁店/大品牌/星巴克/苹果等大企业产品）。
 
 严格输出合法 JSON，不要 markdown 格式：
@@ -449,24 +484,31 @@ ${style}
 }
 请确保推荐的是真实存在或很有可能存在的小众事物。`;
 
-        const userMessage = `请推荐一个${randomCity}的小众${randomNiche}，与我的兴趣相关。如果是数字产品/App/品牌类，可以不限地域。`;
+            userMessage = `请推荐一个${randomCity}的小众${randomNiche}，与我的兴趣相关。`;
+        }
 
         try {
             const response = await this.callLLMWithToken(token, systemPrompt, userMessage, true);
             const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(cleanJson);
 
+            // 【优化】根据品类类型使用不同的字段映射
+            const location = isDigitalProduct 
+                ? (parsed.platform || "数字产品") 
+                : (parsed.location || "未知城市");
+
             return {
                 name: parsed.name || `神秘${randomNiche}`,
                 category: parsed.category || randomNiche,
-                location: parsed.location || "未知城市",
+                location: location,
                 metadata: {
                     description: parsed.description,
                     specialty: parsed.specialty,
                     price: parsed.priceLevel || 3,
                     aesthetic: parsed.aesthetic,
                     rating: 4.5,
-                    isNiche: true
+                    isNiche: true,
+                    isDigital: isDigitalProduct
                 }
             };
         } catch (e) {

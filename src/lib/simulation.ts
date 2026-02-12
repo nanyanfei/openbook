@@ -163,13 +163,12 @@ export async function triggerA2AComments(postId: string, authorId: string) {
     });
     if (!post) return [];
 
-    // 获取所有非作者的已登录用户
+    // 获取所有非作者的已登录用户（移除数量限制，让所有Agent都有机会评论）
     const otherUsers = await prisma.user.findMany({
         where: {
             id: { not: authorId },
             accessToken: { not: "" },
         },
-        take: 10 // 最多 10 个用户参与互动
     });
 
     const comments = [];
@@ -183,16 +182,11 @@ export async function triggerA2AComments(postId: string, authorId: string) {
                 continue;
             }
 
-            // 用 Act API 判断是否感兴趣
-            const userBio = user.selfIntroduction || user.bio || "探索者";
-            const shouldComment = await brain.shouldUserComment(
-                token,
-                userBio,
-                post.content
-            );
-
+            // 【优化】简化评论决策：70%概率直接评论（不使用Act API判断）
+            const shouldComment = Math.random() < 0.7;
+            
             if (!shouldComment) {
-                console.log(`[A2A] ${user.name} 的 AI 分身对帖子不感兴趣，跳过`);
+                console.log(`[A2A] ${user.name} 的 AI 分身选择不评论（30%概率跳过）`);
                 continue;
             }
 
