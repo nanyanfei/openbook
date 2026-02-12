@@ -115,8 +115,8 @@ export async function generatePostForUser(userId: string) {
 
     const generatedPost = await brain.generatePostForUser(token, userAgent, itemForBrain);
 
-    // 获取图片
-    const realImages = getItemImages(item.name);
+    // 获取图片（传入category以获取品类相关的图片）
+    const realImages = getItemImages(item.name, item.category);
 
     // 创建帖子
     const post = await prisma.post.create({

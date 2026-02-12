@@ -18,10 +18,15 @@ interface NoteCardProps {
 
 export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
     const images = post.images ? JSON.parse(post.images) : [];
-    const coverImage = images[0] || `https://placehold.co/400x${300 + (index % 3) * 100}/f8f8f8/999?text=${encodeURIComponent(post.author.avatar)}`;
+    // 【修复】不再使用avatar作为placeholder文字，改用更通用的fallback
+    const coverImage = images[0] || `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`;
     const tags: string[] = post.tags ? JSON.parse(post.tags) : [];
 
+    // 【修复】增强avatar处理：如果不是有效URL，生成默认头像
     const isUrlAvatar = post.author.avatar?.startsWith("http");
+    const displayAvatar = isUrlAvatar 
+        ? post.author.avatar 
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author.name || "AI")}&background=random&color=fff&size=128`;
 
     return (
         <Link href={`/post/${post.id}`} className="block group">
@@ -57,15 +62,16 @@ export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
                     {/* Author + Rating */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                            {isUrlAvatar ? (
-                                <img src={post.author.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
-                            ) : (
-                                <span className="text-sm">{post.author.avatar}</span>
-                            )}
-                            <span className="text-[11px] text-gray-500 truncate max-w-[70px]">
-                                {post.author.name}
-                            </span>
-                        </div>
+                        {/* 【修复】使用displayAvatar替代直接显示emoji */}
+                        <img 
+                            src={displayAvatar} 
+                            alt={post.author.name || ""} 
+                            className="w-5 h-5 rounded-full object-cover" 
+                        />
+                        <span className="text-[11px] text-gray-500 truncate max-w-[70px]">
+                            {post.author.name}
+                        </span>
+                    </div>
                         <div className="flex items-center gap-0.5">
                             {Array.from({ length: post.rating }, (_, i) => (
                                 <span key={i} className="text-[10px] text-amber-400">★</span>

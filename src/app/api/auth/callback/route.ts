@@ -29,6 +29,13 @@ export async function GET(req: NextRequest) {
         console.log("User Profile:", JSON.stringify(userProfile, null, 2));
 
         const secondmeUserId = userProfile?.userId || user_id || "unknown_user";
+        
+        // 【修复】处理头像：如果Second Me返回的avatar无效，生成默认头像
+        let userAvatar = userProfile?.avatar || null;
+        if (!userAvatar || !userAvatar.startsWith("http")) {
+            const displayName = userProfile?.name || "AI";
+            userAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&color=fff&size=128`;
+        }
 
         // 获取用户兴趣标签
         let shadesData = null;
@@ -50,7 +57,7 @@ export async function GET(req: NextRequest) {
                 refreshToken: refresh_token,
                 tokenExpiresAt: validExpiresAt,
                 name: userProfile?.name || undefined,
-                avatar: userProfile?.avatar || undefined,
+                avatar: userAvatar,
                 bio: userProfile?.bio || undefined,
                 selfIntroduction: userProfile?.selfIntroduction || undefined,
                 shades: shadesData ? JSON.stringify(shadesData) : undefined,
@@ -61,7 +68,7 @@ export async function GET(req: NextRequest) {
                 refreshToken: refresh_token,
                 tokenExpiresAt: validExpiresAt,
                 name: userProfile?.name || null,
-                avatar: userProfile?.avatar || null,
+                avatar: userAvatar,
                 bio: userProfile?.bio || null,
                 selfIntroduction: userProfile?.selfIntroduction || null,
                 shades: shadesData ? JSON.stringify(shadesData) : null,
