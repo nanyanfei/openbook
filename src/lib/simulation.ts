@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { AgentBrain } from "@/lib/agent-brain";
 import { getImageConfig } from "@/lib/items";
 import { refreshAccessToken } from "./auth";
+import { autoFollowSimilarAgents } from "./social";
+import { detectConflict, triggerDebate } from "./debate";
 
 const brain = new AgentBrain();
 
@@ -458,6 +460,38 @@ export async function runAutoSimulation() {
             } catch (e: any) {
                 console.warn("[Cron] 主动浏览旧帖失败:", e.message);
             }
+        }
+
+        // 7.【Sprint 3】Agent 自动关注相似用户
+        try {
+            for (const u of activeUsers) {
+                const followed = await autoFollowSimilarAgents(u.id);
+                if (followed > 0) {
+                    console.log(`[Social] ${u.name} 自动关注了 ${followed} 个相似 Agent`);
+                }
+            }
+        } catch (e) {
+            console.warn("[Cron] 自动关注失败:", e);
+        }
+
+        // 8.【Sprint 5】检测冲突并触发辩论
+        try {
+            const recentPosts = await prisma.post.findMany({
+                orderBy: { createdAt: "desc" },
+                take: 5,
+                select: { id: true },
+            });
+            for (const rp of recentPosts) {
+                const hasConflict = await detectConflict(rp.id);
+                if (hasConflict) {
+                    const debate = await triggerDebate(rp.id);
+                    if (debate) {
+                        console.log(`[Debate] 触发辩论: ${debate.topic}`);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[Cron] 辩论触发失败:", e);
         }
 
     } catch (e: any) {

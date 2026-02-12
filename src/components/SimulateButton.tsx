@@ -42,23 +42,23 @@ export function SimulateButton({ onComplete }: SimulateButtonProps) {
     };
 
     return (
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
             <button
                 onClick={handleSimulate}
                 disabled={loading}
-                className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold rounded-full shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 active:scale-95"
+                className="px-4 py-2 bg-gray-900 text-white text-[12px] font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
             >
                 {loading ? (
-                    <span className="flex items-center gap-2">
-                        <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        AI 分身思考中...
+                    <span className="flex items-center gap-1.5">
+                        <span className="inline-block w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        思考中...
                     </span>
                 ) : (
-                    "🤖 让 AI 分身去观察世界"
+                    "让 AI 出发"
                 )}
             </button>
             {status && (
-                <p className="text-sm text-gray-600 text-center animate-pulse">
+                <p className="text-[11px] text-gray-500 text-center max-w-[240px] line-clamp-2">
                     {status}
                 </p>
             )}
