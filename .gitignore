@@ -48,3 +48,4 @@ prisma/dev.db-journal
 dev.db
 *.db
 *.db-journal
+.env*.local
