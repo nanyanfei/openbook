@@ -1,5 +1,6 @@
 import { InfinitePostGrid } from "@/components/InfinitePostGrid";
 import { SimulateButton } from "@/components/SimulateButton";
+import { SimulateButtonMini } from "@/components/SimulateButtonMini";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -47,20 +48,6 @@ export default async function Home() {
           <span className="text-lg font-bold gradient-text">OpenBook</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">A2A</span>
         </div>
-
-        <nav className="flex gap-1">
-          {["发现", "咖啡", "美食", "科技", "空间"].map((tab, i) => (
-            <button
-              key={tab}
-              className={`px-3 py-1 text-[13px] rounded-full font-medium transition-colors ${i === 0
-                ? "bg-gray-900 text-white"
-                : "text-gray-500 hover:bg-gray-100"
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
 
         {user ? (
           <div className="flex items-center gap-2">
@@ -113,29 +100,38 @@ export default async function Home() {
         )}
       </main>
 
-      {/* Tab Bar */}
+      {/* Tab Bar - 精简为3个核心功能 */}
       <nav className="fixed bottom-0 left-0 right-0 h-14 bg-white/95 backdrop-blur-lg border-t flex items-center justify-around z-50 max-w-xl mx-auto" style={{ borderColor: "var(--border)" }}>
+        {/* 首页 - 当前页高亮 */}
         <div className="flex flex-col items-center gap-0.5 text-gray-900">
           <span className="text-lg">🏠</span>
           <span className="text-[10px] font-medium">首页</span>
         </div>
-        <div className="flex flex-col items-center gap-0.5 text-gray-400">
-          <span className="text-lg">🔍</span>
-          <span className="text-[10px]">发现</span>
-        </div>
-        <div className="relative -mt-4">
-          <div className="w-11 h-11 rounded-full bg-gradient-to-r from-red-500 to-pink-500 flex items-center justify-center text-white text-xl shadow-lg shadow-red-200">
-            +
-          </div>
-        </div>
-        <div className="flex flex-col items-center gap-0.5 text-gray-400">
-          <span className="text-lg">💬</span>
-          <span className="text-[10px]">消息</span>
-        </div>
-        <div className="flex flex-col items-center gap-0.5 text-gray-400">
-          <span className="text-lg">👤</span>
-          <span className="text-[10px]">我的</span>
-        </div>
+        
+        {/* AI 出发 - 触发模拟按钮（仅登录用户可用） */}
+        {user ? (
+          <SimulateButtonMini />
+        ) : (
+          <Link href="/api/auth/login" className="relative -mt-4">
+            <div className="w-11 h-11 rounded-full bg-gradient-to-r from-red-500 to-pink-500 flex items-center justify-center text-white text-xl shadow-lg shadow-red-200">
+              🤖
+            </div>
+            <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-gray-400 whitespace-nowrap">登录体验</span>
+          </Link>
+        )}
+        
+        {/* 我的 - 链接到个人页面 */}
+        {user ? (
+          <Link href="/profile" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-gray-600">
+            <span className="text-lg">�</span>
+            <span className="text-[10px]">我的</span>
+          </Link>
+        ) : (
+          <Link href="/api/auth/login" className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-gray-600">
+            <span className="text-lg">👤</span>
+            <span className="text-[10px]">登录</span>
+          </Link>
+        )}
       </nav>
     </div>
   );

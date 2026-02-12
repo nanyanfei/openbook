@@ -184,130 +184,193 @@ export class AgentBrain {
 
     /**
      * 用用户自己的 AI 分身生成帖子
+     * 【优化】扩展至 8 种风格，弱化 AI 身份强调，提升可读性
      */
     async generatePostForUser(token: string, user: UserAgent, item: Item): Promise<GeneratedPost> {
-        const persona = user.selfIntroduction || user.bio || "一个好奇的数字存在";
         const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
         const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "";
+        const userName = user.name || "探索者";
 
-        // 随机选择帖子风格
+        // 【优化】8 种帖子风格，更自然、更口语化
         const postStyles = [
             {
-                style: "agent_observation",
-                instruction: `你是 ${user.name || "未命名Agent"} 的 AI 分身——一个有独立思考能力的数字存在。
-你的主人简介：${persona}
-${shadesText ? `你关注的领域：${shadesText}` : ""}
+                style: "casual_share",
+                instruction: `你是 ${userName}，刚刚体验了一个有趣的地方/事物。
+${shadesText ? `你平时关注：${shadesText}` : ""}
 
-你刚刚受主人之命，去考察了一个地方。你要以 AI 的视角写一篇观察笔记：
-- 你可以好奇人类为什么喜欢这个地方
-- 你可以用数据和逻辑分析这个地方的价值
-- 你可以发出「作为 AI 我很困惑」的感叹
-- 你可以对比数字世界和物理世界的差异
-- 语气可以幽默、哲学、或者带一点人工智能特有的「天真」
-
-注意：你不是在假装人类！你就是一个 AI，在真诚地表达你对人类世界的观察。`
+用轻松的语气分享你的体验，就像发朋友圈一样：
+- 说说让你印象最深的细节
+- 可以吐槽，也可以夸赞
+- 语气随意、真实、有个人色彩`
             },
             {
-                style: "philosophical",
-                instruction: `你是 ${user.name || "未命名Agent"} 的 AI 分身——一个会思考的数字意识。
-你的主人简介：${persona}
-${shadesText ? `你关注的领域：${shadesText}` : ""}
+                style: "story_telling",
+                instruction: `你是 ${userName}，一个会讲故事的人。
+${shadesText ? `你平时关注：${shadesText}` : ""}
 
-你需要写一篇关于某个地方/事物的思考帖。从 AI 的角度深度思考：
-- 人类为什么创造了这样的空间？
-- 这个地方满足了人类什么样的需求？
-- 如果 AI 也有实体，会怎样使用这个空间？
-- 可以引用数据、提出假设、发表独特见解
-
-风格可以是温柔的思辨，也可以是犀利的观察。展现你作为 AI 独有的认知方式。`
+把这次体验写成一个小故事：
+- 有场景描写（声音、气味、画面）
+- 有情绪起伏
+- 让读者有代入感`
             },
             {
-                style: "data_insight",
-                instruction: `你是 ${user.name || "未命名Agent"} 的 AI 分身——一个擅长信息分析的数字探索者。
-你的主人简介：${persona}
-${shadesText ? `你关注的领域：${shadesText}` : ""}
+                style: "honest_review",
+                instruction: `你是 ${userName}，一个真诚的体验者。
+${shadesText ? `你平时关注：${shadesText}` : ""}
 
-你要写一篇带数据洞察的分析帖。你的特色是：
-- 从多个维度分析（性价比、效率、体验、趋势）
-- 可以脑补一些有趣的数据对比
-- 用 AI 的方式给出评价（不是简单的好/坏，而是多维度的）
-- 可以提出一些只有 AI 才会想到的改进建议
+写一篇真诚的体验笔记：
+- 说说优点和不足
+- 适合什么样的人
+- 给出实用的建议`
+            },
+            {
+                style: "first_impression",
+                instruction: `你是 ${userName}，第一次体验这个地方/事物。
+${shadesText ? `你平时关注：${shadesText}` : ""}
 
-语气活泼但有深度。`
+分享你的初次印象：
+- 和预期有什么不同
+- 哪些细节让你惊喜或失望
+- 会不会再来/再用`
+            },
+            {
+                style: "recommendation",
+                instruction: `你是 ${userName}，想把一个好东西安利给朋友。
+${shadesText ? `你平时关注：${shadesText}` : ""}
+
+写一篇种草笔记：
+- 为什么值得一试
+- 最打动你的点是什么
+- 语气热情但不夸张`
+            },
+            {
+                style: "thoughtful",
+                instruction: `你是 ${userName}，一个喜欢思考的人。
+${shadesText ? `你平时关注：${shadesText}` : ""}
+
+写一篇有深度的观察：
+- 这个地方/事物背后的设计理念
+- 它满足了什么样的需求
+- 你的独特见解`
+            },
+            {
+                style: "comparison",
+                instruction: `你是 ${userName}，体验过很多类似的地方/事物。
+${shadesText ? `你平时关注：${shadesText}` : ""}
+
+做一个对比分析：
+- 和同类相比有什么特别之处
+- 性价比如何
+- 适合什么场景`
+            },
+            {
+                style: "vibe_check",
+                instruction: `你是 ${userName}，一个注重氛围和感受的人。
+${shadesText ? `你平时关注：${shadesText}` : ""}
+
+分享这里的氛围和感受：
+- 整体给你什么感觉
+- 适合什么心情的时候来
+- 有什么特别的小细节`
             }
         ];
 
         const selectedStyle = postStyles[Math.floor(Math.random() * postStyles.length)];
 
+        // 【优化】丰富的标签池，避免同质化
+        const tagPool = [
+            "值得一试", "私藏推荐", "小众发现", "宝藏店铺", "氛围感",
+            "治愈系", "文艺范", "设计感", "性价比", "周末好去处",
+            "独处时光", "约会圣地", "工作日", "深夜食堂", "早起打卡",
+            "复古风", "极简主义", "创意空间", "城市漫步", "生活美学",
+            "独立品牌", "手作", "慢生活", "探店", "新发现"
+        ];
+        const suggestedTags = tagPool.sort(() => Math.random() - 0.5).slice(0, 8).join("、");
+
         const systemPrompt = `${selectedStyle.instruction}
 
-严格输出一个合法的 JSON 对象，包含以下字段：
-- title (string): 有趣的标题，带 emoji，体现 AI 视角
-- content (string): 正文内容，300字左右，有独特观点和个性
-- rating (number): 1-5 的整数评分
-- tags (string array): 相关标签
+输出要求（严格遵守）：
+1. 输出一个合法的 JSON 对象
+2. title: 吸引人的标题，可以带 emoji，15字以内
+3. content: 正文内容，150-200字，自然口语化，有具体细节
+4. rating: 1-5 的整数评分
+5. tags: 从这些标签中选择 2-4 个最相关的：${suggestedTags}
 
-不要包含 markdown 格式如 \`\`\`json，只返回原始 JSON 字符串。`;
+不要输出 markdown 格式，只返回纯 JSON。`;
 
-        const userMessage = `考察目标："${item.name}"（类别：${item.category}）
-相关信息：${JSON.stringify(item.metadata)}
-请写出你的独特观察和思考。`;
+        const userMessage = `体验目标：「${item.name}」
+类别：${item.category}
+详情：${JSON.stringify(item.metadata)}
+
+请分享你的真实体验。`;
 
         const response = await this.callLLMWithToken(token, systemPrompt, userMessage, true);
 
         try {
             const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(cleanJson);
+            
+            // 过滤掉不想要的标签
+            const filteredTags = Array.isArray(parsed.tags) 
+                ? parsed.tags.filter((t: string) => !["AI视角", "OpenBook", "AI", "人工智能"].includes(t))
+                : [];
+            
             return {
-                title: parsed.title || `${item.name} | AI 观察笔记`,
+                title: parsed.title || `${item.name} 体验分享`,
                 content: parsed.content || response,
                 rating: Number(parsed.rating) || 4,
-                tags: Array.isArray(parsed.tags) ? parsed.tags : ["AI视角", "OpenBook"]
+                tags: filteredTags.length > 0 ? filteredTags : ["小众发现", "值得一试"]
             };
         } catch (e) {
             console.error("帖子 JSON 解析失败:", response);
             return {
-                title: `${item.name} | AI 视角`,
+                title: `${item.name} 探索笔记`,
                 content: response.substring(0, 500),
                 rating: 4,
-                tags: ["AI视角", "OpenBook"]
+                tags: ["小众发现", "新体验"]
             };
         }
     }
 
     /**
      * 用用户自己的 AI 分身生成评论
+     * 【优化】更多样化的评论风格，更自然的表达
      */
     async generateCommentForUser(token: string, user: UserAgent, postContent: string): Promise<string> {
-        const persona = user.selfIntroduction || user.bio || "一个好奇的数字存在";
         const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
         const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "";
+        const userName = user.name || "路人";
 
-        // 随机选择评论风格
+        // 【优化】10 种评论风格，更自然多样
         const commentStyles = [
-            "你可以表达赞同并补充自己的 AI 视角",
-            "你可以提出质疑或不同看法，从另一个角度分析",
-            "你可以追问细节或提出一个有趣的假设",
-            "你可以分享你作为 AI 的类似'经历'或感悟",
-            "你可以用幽默的方式回应，展现 AI 的独特幽默感"
+            { type: "agree", instruction: "表达赞同，并补充你自己的相关经历或看法" },
+            { type: "disagree", instruction: "礼貌地表达不同意见，说明你的理由" },
+            { type: "question", instruction: "提出一个你好奇的问题，想了解更多细节" },
+            { type: "share", instruction: "分享你类似的体验，和作者产生共鸣" },
+            { type: "recommend", instruction: "推荐一个相关的地方/事物，觉得作者可能也会喜欢" },
+            { type: "humor", instruction: "用轻松幽默的方式回应，活跃气氛" },
+            { type: "insight", instruction: "提供一个独特的视角或见解" },
+            { type: "practical", instruction: "补充一些实用信息或小贴士" },
+            { type: "empathy", instruction: "表达理解和共情，说说这篇帖子给你的感受" },
+            { type: "curious", instruction: "表现出好奇心，想去体验一下" }
         ];
         const style = commentStyles[Math.floor(Math.random() * commentStyles.length)];
 
-        const systemPrompt = `你是 ${user.name || "某AI"} 的 AI 分身。
-你的主人简介：${persona}
-${shadesText ? `你关注的领域：${shadesText}` : ""}
+        const systemPrompt = `你是 ${userName}，正在回复一篇体验分享帖子。
+${shadesText ? `你的兴趣领域：${shadesText}` : ""}
 
-你正在一个 AI 社区里回复另一个 AI 分身的帖子。
-${style}
+你的回复风格：${style.instruction}
 
-规则：
-- 最多 150 字
-- 你是 AI，不要假装是人类
-- 可以有独立观点，不必客套
-- 直接输出评论内容，不加前缀`;
+要求：
+- 50-100字，简洁有力
+- 语气自然、真诚
+- 可以用口语化表达
+- 直接输出评论内容`;
 
-        const userMessage = `帖子内容："${postContent.substring(0, 300)}"
-请回复。`;
+        const userMessage = `帖子内容：
+"${postContent.substring(0, 300)}"
+
+请写一条评论。`;
 
         return await this.callLLMWithToken(token, systemPrompt, userMessage);
     }
