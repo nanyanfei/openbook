@@ -236,41 +236,129 @@ export const MOCK_ITEMS = [
 ];
 
 /**
- * 根据 Item 名称获取图片 URL 列表
- * 【优化】使用Unsplash Source API实现真正的随机图片
+ * 获取图片配置（不再返回固定URL，返回配置对象供前端动态获取）
+ * 【优化】解决图片同质化问题，每个帖子可以有独特的图片
  */
-export function getItemImages(itemName: string, category?: string): string[] {
+export function getImageConfig(itemName: string, category?: string): ImageConfig {
     const item = MOCK_ITEMS.find(i => i.name === itemName);
     if (item && item.images.length > 0) {
-        const shuffled = [...item.images].sort(() => Math.random() - 0.5);
-        return shuffled.slice(0, 1 + Math.floor(Math.random() * 2));
+        // 种子数据使用固定图片
+        return { type: "fixed", urls: item.images };
     }
     
-    // 【优化】使用 Unsplash Source API 获取基于搜索关键词的随机图片
+    // 【优化】更精细的品类关键词映射，每个品类3-4个关键词提升匹配度
     const categoryKeywords: Record<string, string> = {
-        "独立咖啡": "coffee shop,cafe",
-        "特色小食": "food,dessert",
-        "独立书店": "bookstore,books",
-        "艺术空间": "art gallery,museum",
-        "独立音乐": "concert,music",
-        "独立游戏": "gaming,video game",
-        "小众App": "app,technology",
-        "独立护肤品牌": "skincare,beauty",
-        "独立背包品牌": "backpack,travel bag",
-        "小众播客": "podcast,microphone",
-        "手工体验": "handcraft,ceramic",
-        "社区空间": "community,garden",
+        // 咖啡/餐饮类
+        "独立咖啡": "coffee shop,latte art,barista,cafe interior",
+        "特色小食": "artisan food,dessert plating,street food,gourmet",
+        
+        // 书店/文化类
+        "独立书店": "cozy bookstore,reading nook,vintage books,library",
+        
+        // 艺术类
+        "艺术空间": "art gallery,contemporary art,museum,exhibition",
+        
+        // 音乐类
+        "独立音乐": "vinyl records,concert live,music studio,indie band",
+        
+        // 游戏/科技类
+        "独立游戏": "indie game,pixel art,game design,retro gaming",
+        "小众App": "app interface,mobile design,technology,minimal ui",
+        
+        // 产品/品牌类
+        "独立护肤品牌": "organic skincare,natural beauty,spa,wellness",
+        "独立背包品牌": "handmade backpack,travel gear,artisan leather,craftsmanship",
+        
+        // 播客/媒体类
+        "小众播客": "podcast studio,microphone,audio equipment,radio",
+        
+        // 手工/体验类
+        "手工体验": "handcraft workshop,ceramic art,pottery,making",
+        
+        // 社区/空间类
+        "社区空间": "community garden,urban space,shared space,coworking",
+        
+        // 新增品类关键词
+        "小众香水品牌": "niche perfume,fragrance boutique,scent,aromatherapy",
+        "独立手表品牌": "independent watchmaker,timepiece,horology,minimal watch",
+        "小众文具品牌": "stationery,notebook,paper goods,calligraphy",
+        "手工皮具品牌": "leather craft,handmade wallet,artisan leather,bespoke",
+        "独立珠宝设计师": "handmade jewelry,artisan ring,unique necklace,craft",
+        "小众耳机品牌": "audiophile headphones,hi-fi audio,sound quality,music",
+        "独立家居品牌": "home decor,interior design,scandinavian furniture,cozy",
+        "手工蜡烛品牌": "scented candle,soy wax,home fragrance,hand-poured",
+        "独立眼镜品牌": "boutique eyewear,optical frame,vintage glasses,designer",
+        "独立陶瓷工作室": "ceramic studio,pottery wheel,handmade mug,clay art",
+        "小众自行车品牌": "fixed gear bike,custom bicycle,cycling,urban bike",
+        "独立香氛品牌": "home fragrance,reed diffuser,scent,aromatherapy",
+        "手工银饰品牌": "silver jewelry,handmade ring,artisan metalwork,craft",
+        "小众开源工具": "open source software,github,developer tools,coding",
+        "独立开发者产品": "indie hacker,saas product,startup,app development",
+        "小众浏览器插件": "browser extension,productivity tool,chrome plugin",
+        "数字艺术平台": "digital art,nft marketplace,crypto art,illustration",
+        "独立电子杂志": "digital magazine,online publication,zine,editorial",
+        "小众AI工具": "ai assistant,machine learning,automation,smart tool",
+        "独立笔记软件": "note taking app,knowledge management,second brain,productivity",
+        "小众设计工具": "design software,ui design,graphic tool,creative",
+        "独立阅读器": "ebook reader,reading app,digital book,kindle alternative",
+        "小众日历工具": "calendar app,time management,scheduling,productivity",
+        "小众纪录片": "documentary film,independent cinema,non-fiction,storytelling",
+        "独立出版物Zine": "zine culture,independent publishing,diy magazine,print",
+        "地下音乐厂牌": "underground music,indie label,experimental sound,electronic",
+        "独立动画工作室": "animation studio,indie animation,motion graphics,cartoon",
+        "小众桌游": "board game,tabletop game,strategy game,indie game",
+        "独立漫画": "indie comic,graphic novel,manga alternative,illustration",
+        "城市探险路线": "urban exploration,city walk,architecture tour,hidden gem",
+        "小众旅行目的地": "offbeat destination,hidden place,travel photography,adventure",
+        "独立摄影展": "photography exhibition,photo gallery,fine art photo,portrait",
+        "实验音乐现场": "experimental music,noise music,ambient sound,live performance",
+        "独立戏剧团体": "independent theater,drama performance,stage play,experimental",
+        "小众舞蹈工作室": "dance studio,contemporary dance,ballet alternative,movement",
+        "小众运动场馆": "climbing gym,bouldering,skate park,alternative sport",
+        "独立农场市集": "farmers market,organic food,local produce,weekend market",
+        "城市骑行路线": "bike route,cycling path,urban cycling,city tour",
+        "小众露营地": "camping site,glamping,outdoor adventure,nature retreat",
+        "独立瑜伽工作室": "yoga studio,meditation space,mindfulness,wellness",
+        "小众茶馆": "tea house,traditional tea,ceremonial tea,asian culture",
+        "独立花店": "flower shop,bouquet,floral arrangement,plant store",
+        "社区共享厨房": "shared kitchen,community cooking,food co-op,cooking space",
+        "小众疗愈空间": "healing space,meditation room,wellness center,relaxation",
+        "手工造纸工坊": "paper making,handmade paper,craft workshop,traditional",
     };
     
     const keywords = category && categoryKeywords[category] 
         ? categoryKeywords[category] 
-        : "lifestyle";
+        : "lifestyle,minimal,aesthetic";
     
-    // 添加时间戳确保每次获取不同图片
-    const timestamp = Date.now();
-    const randomImageUrl = `https://source.unsplash.com/600x800/?${encodeURIComponent(keywords)}&sig=${timestamp}`;
-    
-    return [randomImageUrl];
+    return {
+        type: "dynamic",
+        keywords,
+        width: 600,
+        height: 800
+    };
+}
+
+/**
+ * 【兼容旧代码】根据 Item 名称获取图片 URL 列表
+ * @deprecated 请使用 getImageConfig 获取配置对象
+ */
+export function getItemImages(itemName: string, category?: string): string[] {
+    const config = getImageConfig(itemName, category);
+    if (config.type === "fixed" && config.urls && config.urls.length > 0) {
+        const shuffled = [...config.urls].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, 1 + Math.floor(Math.random() * 2));
+    }
+    // 动态配置返回空数组（应由前端处理）
+    return [];
+}
+
+// 图片配置类型
+export interface ImageConfig {
+    type: "fixed" | "dynamic";
+    urls?: string[];
+    keywords?: string;
+    width?: number;
+    height?: number;
 }
 
 export async function seedItems(prisma: PrismaClient) {

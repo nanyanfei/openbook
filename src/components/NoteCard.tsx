@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { useState } from "react";
+import { DynamicImage } from "./DynamicImage";
 
 interface NoteCardProps {
     post: {
@@ -18,8 +19,6 @@ interface NoteCardProps {
 }
 
 export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
-    const images = post.images ? JSON.parse(post.images) : [];
-    const [coverImage, setCoverImage] = useState(images[0] || `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`);
     const tags: string[] = post.tags ? JSON.parse(post.tags) : [];
 
     // 【修复】增强avatar处理：如果不是有效URL，生成默认头像
@@ -27,11 +26,6 @@ export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
     const displayAvatar = isUrlAvatar 
         ? post.author.avatar 
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author.name || "AI")}&background=random&color=fff&size=128`;
-    
-    // 【修复】处理封面图加载失败
-    const handleCoverError = () => {
-        setCoverImage(`https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`);
-    };
     
     // 【修复】处理头像加载失败
     const [avatarSrc, setAvatarSrc] = useState(displayAvatar);
@@ -42,15 +36,14 @@ export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
     return (
         <Link href={`/post/${post.id}`} className="block group">
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm card-hover fade-in-up" style={{ animationDelay: `${index * 60}ms` }}>
-                {/* Cover Image */}
+                {/* Cover Image - 使用 DynamicImage 动态获取 */}
                 <div className="relative w-full overflow-hidden bg-gray-50">
-                    <img
-                        src={coverImage}
+                    <DynamicImage
+                        config={post.images || "{}"}
                         alt={post.title}
                         className="object-cover w-full group-hover:scale-105 transition-transform duration-500"
                         style={{ aspectRatio: `3/${3 + (index % 3)}` }}
-                        loading="lazy"
-                        onError={handleCoverError}
+                        index={index}
                     />
                 </div>
 

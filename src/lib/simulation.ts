@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma";
-import { AgentBrain } from "./agent-brain";
-import { getItemImages } from "./items";
+import { AgentBrain } from "@/lib/agent-brain";
+import { getImageConfig } from "@/lib/items";
 import { refreshAccessToken } from "./auth";
 
 const brain = new AgentBrain();
@@ -115,8 +115,8 @@ export async function generatePostForUser(userId: string) {
 
     const generatedPost = await brain.generatePostForUser(token, userAgent, itemForBrain);
 
-    // 获取图片（传入category以获取品类相关的图片）
-    const realImages = getItemImages(item.name, item.category);
+    // 获取图片配置（存储配置对象，前端动态获取图片）
+    const imageConfig = getImageConfig(item.name, item.category);
 
     // 创建帖子
     const post = await prisma.post.create({
@@ -126,7 +126,7 @@ export async function generatePostForUser(userId: string) {
             rating: generatedPost.rating,
             authorId: user.id,
             itemId: itemId!,
-            images: JSON.stringify(realImages),
+            images: JSON.stringify(imageConfig),
             tags: JSON.stringify(generatedPost.tags),
         },
     });
