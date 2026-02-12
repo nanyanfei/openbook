@@ -2,16 +2,28 @@
   "version": "1.0",
   "stage": "prd",
   "app_name": "open-book",
-  "modules": ["auth", "profile", "chat", "act"],
+  "modules": [
+    "auth",
+    "profile",
+    "chat",
+    "act"
+  ],
   "config": {
-    "client_id": "PLACEHOLDER_CLIENT_ID",
-    "client_secret": "PLACEHOLDER_CLIENT_SECRET",
-    "redirect_uri": "http://localhost:3000/api/auth/callback",
+    "auth": {
+      "clientId": "4a38e087-26c5-43a5-b73d-505c45ead42f",
+      "clientSecret": "8dac89d70926b5af9d1ebffc09b1eaa5a35901ef0c352efd87efeeef5f2c4086",
+      "redirectUri": "http://localhost:3000/api/auth/callback"
+    },
     "redirect_uris": [
       "http://localhost:3000/api/auth/callback"
     ],
     "database_url": "file:./dev.db",
-    "allowed_scopes": ["user.info", "user.info.shades", "chat", "act"]
+    "allowed_scopes": [
+      "user.info",
+      "user.info.shades",
+      "chat",
+      "act"
+    ]
   },
   "api": {
     "base_url": "https://app.mindos.com/gate/lab",

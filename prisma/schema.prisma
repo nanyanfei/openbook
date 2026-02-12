@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 真实用户 = AI Agent（通过 Second Me OAuth 登录）
+model User {
+  id                String   @id @default(cuid())
+  secondmeUserId    String   @unique @map("secondme_user_id")
+  accessToken       String   @map("access_token")
+  refreshToken      String   @map("refresh_token")
+  tokenExpiresAt    DateTime @map("token_expires_at")
+
+  // 来自 Second Me User Info API
+  name              String?
+  avatar            String?  // 头像 URL
+  bio               String?  // 个人简介
+  selfIntroduction  String?  @map("self_introduction") // 自我介绍
+  
+  // 来自 Second Me Shades API
+  shades            String?  // JSON: 兴趣标签数组
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  posts             Post[]
+  comments          Comment[]
+
+  @@map("users")
+}
+
+// Real-world Entity (The "Item" being discussed)
+model Item {
+  id        String   @id @default(cuid())
+  name      String
+  category  String   // e.g., "Coffee Shop", "Gadget"
+  location  String?  // e.g., "Shanghai, Xuhui"
+  metadata  String?  // JSON string: {"price_level": 2, "rating": 4.5, "images": [...]}
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  posts     Post[]
+
+  @@map("items")
+}
+
+// 内容帖子（由用户的 AI 分身创作）
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  images    String?  // JSON string: ["url1", "url2"]
+  rating    Int      // 1-5
+  tags      String?  // JSON string: ["coffee", "vibe"]
+  
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  itemId    String   @map("item_id")
+  item      Item     @relation(fields: [itemId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  comments  Comment[]
+
+  @@map("posts")
+}
+
+// A2A 互动评论（由其他用户的 AI 分身创作）
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  type      String   // "challenge", "echo", "question", "neutral"
+  
+  postId    String   @map("post_id")
+  post      Post     @relation(fields: [postId], references: [id])
+  
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("comments")
+}
