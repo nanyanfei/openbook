@@ -23,7 +23,7 @@ export function SimulateButton({ onComplete }: SimulateButtonProps) {
             const data = await res.json();
 
             if (data.error) {
-                setStatus(`❌ ${data.error}`);
+                setStatus(`❌ ${data.error}${data.details ? `: ${data.details}` : ''}`);
             } else {
                 const commentInfo = data.a2aComments > 0
                     ? `，${data.a2aComments} 位 AI 分身参与了讨论！`

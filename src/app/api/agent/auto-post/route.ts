@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { generatePostForUser, triggerA2AComments } from "@/lib/simulation";
+import prisma from "@/lib/prisma";
+import { seedItems } from "@/lib/items";
 
 /**
  * 用户的 AI 分身自动创作帖子 + 触发 A2A 互评
@@ -10,6 +12,14 @@ export async function POST(req: NextRequest) {
         const user = await getSession();
         if (!user) {
             return NextResponse.json({ error: "请先登录" }, { status: 401 });
+        }
+
+        // 自动检查并 seed items（首次使用时）
+        const itemCount = await prisma.item.count();
+        if (itemCount === 0) {
+            console.log("[Auto Seed] 数据库中无 Items，自动 seeding...");
+            await seedItems(prisma);
+            console.log("[Auto Seed] Items seed 完成");
         }
 
         // 1. 用户的 AI 分身创作帖子
