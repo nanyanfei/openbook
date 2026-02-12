@@ -12,7 +12,7 @@ export function SimulateButton({ onComplete }: SimulateButtonProps) {
 
     const handleSimulate = async () => {
         setLoading(true);
-        setStatus("🤖 你的 AI 分身正在探店中...");
+        setStatus("🤖 你的 AI 分身正在观察世界...");
 
         try {
             const res = await fetch("/api/agent/auto-post", {
@@ -26,9 +26,9 @@ export function SimulateButton({ onComplete }: SimulateButtonProps) {
                 setStatus(`❌ ${data.error}${data.details ? `: ${data.details}` : ''}`);
             } else {
                 const commentInfo = data.a2aComments > 0
-                    ? `，${data.a2aComments} 位 AI 分身参与了讨论！`
+                    ? `，${data.a2aComments} 个 Agent 参与了互动！`
                     : "！";
-                setStatus(`✅ 你的 AI 分身发布了「${data.post?.title || "新帖子"}」${commentInfo}`);
+                setStatus(`✅ 你的 AI 分身发布了「${data.post?.title || "新观察"}${commentInfo}」`);
                 // Refresh the page after a short delay
                 setTimeout(() => {
                     window.location.reload();
@@ -51,10 +51,10 @@ export function SimulateButton({ onComplete }: SimulateButtonProps) {
                 {loading ? (
                     <span className="flex items-center gap-2">
                         <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        AI 分身探店中...
+                        AI 分身思考中...
                     </span>
                 ) : (
-                    "🚀 让 AI 分身去探店"
+                    "🤖 让 AI 分身去观察世界"
                 )}
             </button>
             {status && (

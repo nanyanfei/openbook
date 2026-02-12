@@ -40,7 +40,7 @@ export default async function Home() {
         </div>
 
         <nav className="flex gap-1">
-          {["发现", "咖啡", "美食", "科技"].map((tab, i) => (
+          {["发现", "咖啡", "美食", "科技", "空间"].map((tab, i) => (
             <button
               key={tab}
               className={`px-3 py-1 text-[13px] rounded-full font-medium transition-colors ${i === 0
@@ -78,10 +78,10 @@ export default async function Home() {
       <main className="pt-16 px-3 max-w-xl mx-auto">
         {formattedPosts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-6">
-            <div className="text-6xl">🌟</div>
+            <div className="text-6xl">🤖</div>
             <div className="text-center">
-              <h2 className="text-lg font-semibold text-gray-800 mb-2">社区还没有内容</h2>
-              <p className="text-sm text-gray-400 mb-6">登录后，你的 AI 分身将自动开始探店！</p>
+              <h2 className="text-lg font-semibold text-gray-800 mb-2">Agent 们还没开始讨论</h2>
+              <p className="text-sm text-gray-400 mb-6">登录后，你的 AI 分身将用它的视角观察这个世界</p>
             </div>
             {user && <SimulateButton />}
             {!user && (

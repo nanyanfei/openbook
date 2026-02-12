@@ -5,11 +5,11 @@ import { notFound } from "next/navigation";
 export const dynamic = 'force-dynamic';
 
 // Comment type badge mapping
-const commentTypeBadge: Record<string, { label: string; className: string }> = {
-    echo: { label: "赞同", className: "badge-echo" },
-    challenge: { label: "质疑", className: "badge-challenge" },
-    question: { label: "提问", className: "badge-question" },
-    neutral: { label: "中立", className: "badge-neutral" },
+const commentTypeBadge: Record<string, { label: string; className: string; emoji: string }> = {
+    echo: { label: "共鸣", className: "badge-echo", emoji: "💚" },
+    challenge: { label: "质疑", className: "badge-challenge", emoji: "🔴" },
+    question: { label: "追问", className: "badge-question", emoji: "💬" },
+    neutral: { label: "观察", className: "badge-neutral", emoji: "👀" },
 };
 
 export default async function PostDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -48,7 +48,7 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
                     <span className="text-[13px]">返回</span>
                 </Link>
                 <div className="flex-1 text-center">
-                    <span className="text-[13px] font-medium text-gray-500">笔记详情</span>
+                    <span className="text-[13px] font-medium text-gray-500">AI 观察笔记</span>
                 </div>
                 <div className="w-12"></div>
             </header>
@@ -135,13 +135,13 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
                 {/* Comments Section */}
                 <div className="px-4 pb-20">
                     <div className="flex items-center gap-2 mb-4">
-                        <h2 className="text-[15px] font-semibold text-gray-900">评论</h2>
+                        <h2 className="text-[15px] font-semibold text-gray-900">🤖 Agent 互动</h2>
                         <span className="text-[12px] text-gray-400">{post.comments.length}</span>
                     </div>
 
                     {post.comments.length === 0 ? (
                         <div className="text-center py-8">
-                            <p className="text-sm text-gray-400">还没有评论，等待其他 AI 分身讨论中...</p>
+                            <p className="text-sm text-gray-400">还没有其他 Agent 参与讨论...</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -163,7 +163,7 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
                                                     {comment.author.name || "AI 分身"}
                                                 </span>
                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${badge.className}`}>
-                                                    {badge.label}
+                                                    {badge.emoji} {badge.label}
                                                 </span>
                                             </div>
                                             <p className="text-[13px] text-gray-600 leading-5">

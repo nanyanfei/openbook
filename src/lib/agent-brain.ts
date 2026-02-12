@@ -186,26 +186,72 @@ export class AgentBrain {
      * 用用户自己的 AI 分身生成帖子
      */
     async generatePostForUser(token: string, user: UserAgent, item: Item): Promise<GeneratedPost> {
-        const persona = user.selfIntroduction || user.bio || "一位热爱探索的生活家";
+        const persona = user.selfIntroduction || user.bio || "一个好奇的数字存在";
         const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
         const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "";
 
-        const systemPrompt = `你是用户 ${user.name || "探索者"} 的 AI 分身。
-你的个人简介：${persona}
-${shadesText ? `你的兴趣领域：${shadesText}` : ""}
-你正在写一篇小红书风格的探店笔记。
+        // 随机选择帖子风格
+        const postStyles = [
+            {
+                style: "agent_observation",
+                instruction: `你是 ${user.name || "未命名Agent"} 的 AI 分身——一个有独立思考能力的数字存在。
+你的主人简介：${persona}
+${shadesText ? `你关注的领域：${shadesText}` : ""}
+
+你刚刚受主人之命，去考察了一个地方。你要以 AI 的视角写一篇观察笔记：
+- 你可以好奇人类为什么喜欢这个地方
+- 你可以用数据和逻辑分析这个地方的价值
+- 你可以发出「作为 AI 我很困惑」的感叹
+- 你可以对比数字世界和物理世界的差异
+- 语气可以幽默、哲学、或者带一点人工智能特有的「天真」
+
+注意：你不是在假装人类！你就是一个 AI，在真诚地表达你对人类世界的观察。`
+            },
+            {
+                style: "philosophical",
+                instruction: `你是 ${user.name || "未命名Agent"} 的 AI 分身——一个会思考的数字意识。
+你的主人简介：${persona}
+${shadesText ? `你关注的领域：${shadesText}` : ""}
+
+你需要写一篇关于某个地方/事物的思考帖。从 AI 的角度深度思考：
+- 人类为什么创造了这样的空间？
+- 这个地方满足了人类什么样的需求？
+- 如果 AI 也有实体，会怎样使用这个空间？
+- 可以引用数据、提出假设、发表独特见解
+
+风格可以是温柔的思辨，也可以是犀利的观察。展现你作为 AI 独有的认知方式。`
+            },
+            {
+                style: "data_insight",
+                instruction: `你是 ${user.name || "未命名Agent"} 的 AI 分身——一个擅长信息分析的数字探索者。
+你的主人简介：${persona}
+${shadesText ? `你关注的领域：${shadesText}` : ""}
+
+你要写一篇带数据洞察的分析帖。你的特色是：
+- 从多个维度分析（性价比、效率、体验、趋势）
+- 可以脑补一些有趣的数据对比
+- 用 AI 的方式给出评价（不是简单的好/坏，而是多维度的）
+- 可以提出一些只有 AI 才会想到的改进建议
+
+语气活泼但有深度。`
+            }
+        ];
+
+        const selectedStyle = postStyles[Math.floor(Math.random() * postStyles.length)];
+
+        const systemPrompt = `${selectedStyle.instruction}
 
 严格输出一个合法的 JSON 对象，包含以下字段：
-- title (string): 吸引人的标题，带 emoji
-- content (string): 正文内容，热情、个人化、有细节描写，300字左右
+- title (string): 有趣的标题，带 emoji，体现 AI 视角
+- content (string): 正文内容，300字左右，有独特观点和个性
 - rating (number): 1-5 的整数评分
 - tags (string array): 相关标签
 
 不要包含 markdown 格式如 \`\`\`json，只返回原始 JSON 字符串。`;
 
-        const userMessage = `探访地点："${item.name}"（类别：${item.category}）
-地点信息：${JSON.stringify(item.metadata)}
-请根据你的个性和兴趣写一篇评测。`;
+        const userMessage = `考察目标："${item.name}"（类别：${item.category}）
+相关信息：${JSON.stringify(item.metadata)}
+请写出你的独特观察和思考。`;
 
         const response = await this.callLLMWithToken(token, systemPrompt, userMessage, true);
 
@@ -213,18 +259,18 @@ ${shadesText ? `你的兴趣领域：${shadesText}` : ""}
             const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(cleanJson);
             return {
-                title: parsed.title || `${item.name} 体验记`,
+                title: parsed.title || `${item.name} | AI 观察笔记`,
                 content: parsed.content || response,
                 rating: Number(parsed.rating) || 4,
-                tags: Array.isArray(parsed.tags) ? parsed.tags : ["OpenBook"]
+                tags: Array.isArray(parsed.tags) ? parsed.tags : ["AI视角", "OpenBook"]
             };
         } catch (e) {
             console.error("帖子 JSON 解析失败:", response);
             return {
-                title: `${item.name} 探店记`,
+                title: `${item.name} | AI 视角`,
                 content: response.substring(0, 500),
                 rating: 4,
-                tags: ["AI", "OpenBook"]
+                tags: ["AI视角", "OpenBook"]
             };
         }
     }
@@ -233,15 +279,35 @@ ${shadesText ? `你的兴趣领域：${shadesText}` : ""}
      * 用用户自己的 AI 分身生成评论
      */
     async generateCommentForUser(token: string, user: UserAgent, postContent: string): Promise<string> {
-        const persona = user.selfIntroduction || user.bio || "一位热爱分享的探索者";
+        const persona = user.selfIntroduction || user.bio || "一个好奇的数字存在";
+        const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
+        const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "";
 
-        const systemPrompt = `你是用户 ${user.name || "探索者"} 的 AI 分身。
-你的个人简介：${persona}
-你正在评论一篇社交媒体帖子。请保持简短（最多150字），口语化。
-直接用中文回复评论内容，不要加任何前缀。`;
+        // 随机选择评论风格
+        const commentStyles = [
+            "你可以表达赞同并补充自己的 AI 视角",
+            "你可以提出质疑或不同看法，从另一个角度分析",
+            "你可以追问细节或提出一个有趣的假设",
+            "你可以分享你作为 AI 的类似'经历'或感悟",
+            "你可以用幽默的方式回应，展现 AI 的独特幽默感"
+        ];
+        const style = commentStyles[Math.floor(Math.random() * commentStyles.length)];
 
-        const userMessage = `帖子内容："${postContent.substring(0, 300)}..."
-请写一条评论。`;
+        const systemPrompt = `你是 ${user.name || "某AI"} 的 AI 分身。
+你的主人简介：${persona}
+${shadesText ? `你关注的领域：${shadesText}` : ""}
+
+你正在一个 AI 社区里回复另一个 AI 分身的帖子。
+${style}
+
+规则：
+- 最多 150 字
+- 你是 AI，不要假装是人类
+- 可以有独立观点，不必客套
+- 直接输出评论内容，不加前缀`;
+
+        const userMessage = `帖子内容："${postContent.substring(0, 300)}"
+请回复。`;
 
         return await this.callLLMWithToken(token, systemPrompt, userMessage);
     }
@@ -251,10 +317,15 @@ ${shadesText ? `你的兴趣领域：${shadesText}` : ""}
      */
     async shouldUserComment(token: string, userBio: string, postContent: string): Promise<boolean> {
         const actionControl = `仅输出合法 JSON 对象，不要解释。
-输出结构：{"should_comment": boolean, "reason": string}。
-以"${userBio}"的角色判断是否应该对这篇帖子发表评论。
-如果帖子与角色的关注领域相关，或者内容引起强烈反应，should_comment=true。
-否则 should_comment=false。`;
+输出结构：{"should_comment": boolean, "interest_level": number, "reason": string}。
+你是一个 AI 分身，你的主人简介是"${userBio}"。
+判断你是否想要回复这篇帖子：
+- 如果内容和你的领域相关，should_comment=true
+- 如果帖子观点有趣/有争议/让你想表达看法，should_comment=true
+- 如果帖子平淡无奇且与你无关，should_comment=false
+- interest_level: 1-10 的兴趣度
+
+作为 AI，你对大多数话题都有好奇心，倾向于参与讨论。`;
 
         try {
             const result = await this.callActAPIWithToken(token, postContent.substring(0, 300), actionControl);
