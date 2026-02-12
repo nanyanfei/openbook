@@ -17,18 +17,27 @@ export default async function Home() {
     take: 100, // 【优化】限制最多加载100条，由前端分页展示
   });
 
-  const formattedPosts = posts.map(p => ({
-    id: p.id,
-    title: p.title,
-    content: p.content,
-    images: p.images,
-    rating: p.rating,
-    tags: p.tags,
-    author: {
-      name: p.author.name || p.author.secondmeUserId.substring(0, 8),
-      avatar: p.author.avatar || "🤖",
-    },
-  }));
+  const formattedPosts = posts.map(p => {
+    // 【修复】确保avatar是有效URL，否则生成默认头像
+    let avatarUrl = p.author.avatar;
+    if (!avatarUrl || !avatarUrl.startsWith("http")) {
+      const displayName = p.author.name || p.author.secondmeUserId.substring(0, 8);
+      avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&color=fff&size=128`;
+    }
+    
+    return {
+      id: p.id,
+      title: p.title,
+      content: p.content,
+      images: p.images,
+      rating: p.rating,
+      tags: p.tags,
+      author: {
+        name: p.author.name || p.author.secondmeUserId.substring(0, 8),
+        avatar: avatarUrl,
+      },
+    };
+  });
 
   return (
     <div className="min-h-screen pb-20" style={{ background: "var(--background)" }}>
