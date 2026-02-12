@@ -237,7 +237,7 @@ export const MOCK_ITEMS = [
 
 /**
  * 根据 Item 名称获取图片 URL 列表
- * 【优化】根据category返回对应的图片，解决AI发现新话题时图片同质化问题
+ * 【优化】使用Unsplash Source API实现真正的随机图片
  */
 export function getItemImages(itemName: string, category?: string): string[] {
     const item = MOCK_ITEMS.find(i => i.name === itemName);
@@ -246,89 +246,31 @@ export function getItemImages(itemName: string, category?: string): string[] {
         return shuffled.slice(0, 1 + Math.floor(Math.random() * 2));
     }
     
-    // 【优化】根据品类返回对应的Unsplash图片
-    const categoryImages: Record<string, string[]> = {
-        // 咖啡/餐饮类
-        "独立咖啡": [
-            "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=600&h=800&fit=crop",
-        ],
-        "特色小食": [
-            "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=600&h=800&fit=crop",
-        ],
-        // 书店/文化类
-        "独立书店": [
-            "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=600&h=800&fit=crop",
-        ],
-        // 艺术类
-        "艺术空间": [
-            "https://images.unsplash.com/photo-1531572753322-ad063cecc140?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1544967082-d9d25d867d66?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1518998053901-5348d3961a04?w=600&h=800&fit=crop",
-        ],
-        // 音乐类
-        "独立音乐": [
-            "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=800&fit=crop",
-        ],
-        // 游戏/科技类
-        "独立游戏": [
-            "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1552820728-8b83bb6b2b0e?w=600&h=800&fit=crop",
-        ],
-        "小众App": [
-            "https://images.unsplash.com/photo-1517842645767-c639042777db?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&h=800&fit=crop",
-        ],
-        // 产品/品牌类
-        "独立护肤品牌": [
-            "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=600&h=800&fit=crop",
-        ],
-        "独立背包品牌": [
-            "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?w=600&h=800&fit=crop",
-        ],
-        // 播客/媒体类
-        "小众播客": [
-            "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1589903308904-1010c2294adc?w=600&h=800&fit=crop",
-        ],
-        // 手工/体验类
-        "手工体验": [
-            "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1493106641515-6b5631de4bb9?w=600&h=800&fit=crop",
-        ],
-        "社区空间": [
-            "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&h=800&fit=crop",
-            "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=600&h=800&fit=crop",
-        ],
+    // 【优化】使用 Unsplash Source API 获取基于搜索关键词的随机图片
+    const categoryKeywords: Record<string, string> = {
+        "独立咖啡": "coffee shop,cafe",
+        "特色小食": "food,dessert",
+        "独立书店": "bookstore,books",
+        "艺术空间": "art gallery,museum",
+        "独立音乐": "concert,music",
+        "独立游戏": "gaming,video game",
+        "小众App": "app,technology",
+        "独立护肤品牌": "skincare,beauty",
+        "独立背包品牌": "backpack,travel bag",
+        "小众播客": "podcast,microphone",
+        "手工体验": "handcraft,ceramic",
+        "社区空间": "community,garden",
     };
     
-    // 根据category返回对应图片，如果没有匹配则使用通用数字/生活方式图片
-    if (category && categoryImages[category]) {
-        const images = categoryImages[category];
-        return [images[Math.floor(Math.random() * images.length)]];
-    }
+    const keywords = category && categoryKeywords[category] 
+        ? categoryKeywords[category] 
+        : "lifestyle";
     
-    // 通用fallback图片（更丰富的选择）
-    const generalFallbacks = [
-        "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop", // 科技
-        "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=600&h=800&fit=crop", // 工作空间
-        "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=600&h=800&fit=crop", // 团队
-        "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=800&fit=crop", // 学习
-        "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&h=800&fit=crop", // 自然
-    ];
-    return [generalFallbacks[Math.floor(Math.random() * generalFallbacks.length)]];
+    // 添加时间戳确保每次获取不同图片
+    const timestamp = Date.now();
+    const randomImageUrl = `https://source.unsplash.com/600x800/?${encodeURIComponent(keywords)}&sig=${timestamp}`;
+    
+    return [randomImageUrl];
 }
 
 export async function seedItems(prisma: PrismaClient) {

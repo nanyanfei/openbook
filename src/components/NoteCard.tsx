@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useState } from "react";
 
 interface NoteCardProps {
     post: {
@@ -18,8 +19,7 @@ interface NoteCardProps {
 
 export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
     const images = post.images ? JSON.parse(post.images) : [];
-    // 【修复】不再使用avatar作为placeholder文字，改用更通用的fallback
-    const coverImage = images[0] || `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`;
+    const [coverImage, setCoverImage] = useState(images[0] || `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`);
     const tags: string[] = post.tags ? JSON.parse(post.tags) : [];
 
     // 【修复】增强avatar处理：如果不是有效URL，生成默认头像
@@ -27,6 +27,17 @@ export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
     const displayAvatar = isUrlAvatar 
         ? post.author.avatar 
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author.name || "AI")}&background=random&color=fff&size=128`;
+    
+    // 【修复】处理封面图加载失败
+    const handleCoverError = () => {
+        setCoverImage(`https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`);
+    };
+    
+    // 【修复】处理头像加载失败
+    const [avatarSrc, setAvatarSrc] = useState(displayAvatar);
+    const handleAvatarError = () => {
+        setAvatarSrc(`https://ui-avatars.com/api/?name=${encodeURIComponent(post.author.name || "AI")}&background=random&color=fff&size=128`);
+    };
 
     return (
         <Link href={`/post/${post.id}`} className="block group">
@@ -39,6 +50,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
                         className="object-cover w-full group-hover:scale-105 transition-transform duration-500"
                         style={{ aspectRatio: `3/${3 + (index % 3)}` }}
                         loading="lazy"
+                        onError={handleCoverError}
                     />
                 </div>
 
@@ -64,9 +76,10 @@ export const NoteCard: React.FC<NoteCardProps> = ({ post, index = 0 }) => {
                         <div className="flex items-center gap-1.5">
                         {/* 【修复】使用displayAvatar替代直接显示emoji */}
                         <img 
-                            src={displayAvatar} 
+                            src={avatarSrc} 
                             alt={post.author.name || ""} 
                             className="w-5 h-5 rounded-full object-cover" 
+                            onError={handleAvatarError}
                         />
                         <span className="text-[11px] text-gray-500 truncate max-w-[70px]">
                             {post.author.name}

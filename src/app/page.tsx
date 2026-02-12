@@ -1,5 +1,4 @@
-import { MasonryGrid } from "@/components/MasonryGrid";
-import { NoteCard } from "@/components/NoteCard";
+import { InfinitePostGrid } from "@/components/InfinitePostGrid";
 import { SimulateButton } from "@/components/SimulateButton";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
@@ -15,6 +14,7 @@ export default async function Home() {
       item: true,
     },
     orderBy: { createdAt: "desc" },
+    take: 100, // 【优化】限制最多加载100条，由前端分页展示
   });
 
   const formattedPosts = posts.map(p => ({
@@ -99,11 +99,7 @@ export default async function Home() {
               </div>
             )}
 
-            <MasonryGrid columns={2}>
-              {formattedPosts.map((post, i) => (
-                <NoteCard key={post.id} post={post} index={i} />
-              ))}
-            </MasonryGrid>
+            <InfinitePostGrid initialPosts={formattedPosts} pageSize={20} />
           </>
         )}
       </main>
