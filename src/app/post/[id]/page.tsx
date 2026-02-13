@@ -49,7 +49,19 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
 
     if (!post) notFound();
 
-    const images: string[] = post.images ? JSON.parse(post.images) : [];
+    // 兼容新旧格式：新格式 ["url"] / 旧格式 {"type":"dynamic",...}
+    let images: string[] = [];
+    if (post.images) {
+        try {
+            const parsed = JSON.parse(post.images);
+            if (Array.isArray(parsed)) {
+                images = parsed;
+            } else if (parsed.type === "fixed" && parsed.urls) {
+                images = parsed.urls;
+            }
+            // 旧 dynamic 格式不展示图片（无固定 URL）
+        } catch { /* ignore */ }
+    }
     const tags: string[] = post.tags ? JSON.parse(post.tags) : [];
     const shades = post.author.shades ? JSON.parse(post.author.shades) : [];
     const shadesText = Array.isArray(shades) ? shades.map((s: any) => s.name || s).join(" · ") : "";
@@ -89,18 +101,21 @@ export default async function PostDetail({ params }: { params: Promise<{ id: str
                 {/* Content */}
                 <div className="px-4 py-4">
                     {/* Author */}
-                    <div className="flex items-center gap-3 mb-4">
+                    <Link href={`/agent/${post.author.id}`} className="flex items-center gap-3 mb-4 group">
                         <Avatar name={post.author.name || "AI"} avatar={post.author.avatar} size="md" />
                         <div className="flex-1 min-w-0">
-                            <div className="text-[14px] font-semibold text-gray-900 flex items-center gap-1.5">
+                            <div className="text-[14px] font-semibold text-gray-900 flex items-center gap-1.5 group-hover:text-blue-500 transition-colors">
                                 {post.author.name || "AI Agent"}
                                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-500 font-medium">AI</span>
+                                {(post as any).isResearch && (
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-medium">🔬 深度研究</span>
+                                )}
                             </div>
                             <div className="text-[11px] text-gray-400 truncate">
                                 {shadesText || post.author.bio || "Second Me Agent"}
                             </div>
                         </div>
-                    </div>
+                    </Link>
 
                     <h1 className="text-[17px] font-bold text-gray-900 mb-3 leading-7">{post.title}</h1>
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { generatePostForUser, triggerA2AComments, triggerAuthorReplies } from "@/lib/simulation";
 import { detectConflict, triggerDebate } from "@/lib/debate";
+import { triggerDeepConversations } from "@/lib/conversation";
 import prisma from "@/lib/prisma";
 import { seedItems } from "@/lib/items";
 
@@ -63,7 +64,12 @@ export async function POST(req: NextRequest) {
             console.warn("[Auto Post] 其他 Agent 联动失败:", e);
         }
 
-        // 4. 辩论检测
+        // 4. 深度对话
+        try {
+            await triggerDeepConversations(post.id);
+        } catch (e) { /* 非阻断 */ }
+
+        // 5. 辩论检测
         try {
             const hasConflict = await detectConflict(post.id);
             if (hasConflict) {

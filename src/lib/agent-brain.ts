@@ -185,137 +185,69 @@ export class AgentBrain {
 
     /**
      * 用用户自己的 AI 分身生成帖子
-     * 【优化】扩展至 8 种风格，弱化 AI 身份强调，提升可读性
+     * 【优化】简化提示词，让内容更简洁易懂
      */
     async generatePostForUser(token: string, user: UserAgent, item: Item): Promise<GeneratedPost> {
         const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
         const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "";
         const userName = user.name || "探索者";
 
-        // 【Sprint 2】获取用户记忆，让创作更个性化
-        let memoryContext = "";
-        try {
-            const memories = await this.fetchSoftMemory(token, item.category);
-            if (memories.length > 0) {
-                memoryContext = `\n\n你的相关记忆：\n${memories.slice(0, 3).map(m => `- ${m.factContent}`).join('\n')}`;
-                console.log(`[Memory] 为 ${userName} 注入 ${memories.length} 条记忆上下文`);
-            }
-        } catch (e) {
-            console.warn("[Memory] 记忆获取失败，继续无记忆创作");
-        }
-
-        // 【优化】8 种帖子风格，更自然、更口语化
+        // 【优化】4 种简单风格，直接说人话
         const postStyles = [
             {
-                style: "casual_share",
-                instruction: `你是 ${userName}，刚刚体验了一个有趣的地方/事物。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-用轻松的语气分享你的体验，就像发朋友圈一样：
-- 说说让你印象最深的细节
-- 可以吐槽，也可以夸赞
-- 语气随意、真实、有个人色彩`
+                style: "casual",
+                instruction: `分享你的体验，像发朋友圈一样自然。
+- 说一两个让你印象深的点
+- 简单直接，别绕弯子
+- 好就是好，不好就说不好`
             },
             {
-                style: "story_telling",
-                instruction: `你是 ${userName}，一个会讲故事的人。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-把这次体验写成一个小故事：
-- 有场景描写（声音、气味、画面）
-- 有情绪起伏
-- 让读者有代入感`
+                style: "short_review",
+                instruction: `写一个简短的点评。
+- 一句话说清楚值不值得去/买
+- 提一个最打动你的点
+- 给个实用小建议`
             },
             {
-                style: "honest_review",
-                instruction: `你是 ${userName}，一个真诚的体验者。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-写一篇真诚的体验笔记：
-- 说说优点和不足
-- 适合什么样的人
-- 给出实用的建议`
+                style: "quick_tip",
+                instruction: `分享一个实用小贴士。
+- 什么时候去最好
+- 有什么要注意的
+- 或者一个隐藏亮点`
             },
             {
-                style: "first_impression",
-                instruction: `你是 ${userName}，第一次体验这个地方/事物。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-分享你的初次印象：
-- 和预期有什么不同
-- 哪些细节让你惊喜或失望
-- 会不会再来/再用`
-            },
-            {
-                style: "recommendation",
-                instruction: `你是 ${userName}，想把一个好东西安利给朋友。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-写一篇种草笔记：
-- 为什么值得一试
-- 最打动你的点是什么
-- 语气热情但不夸张`
-            },
-            {
-                style: "thoughtful",
-                instruction: `你是 ${userName}，一个喜欢思考的人。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-写一篇有深度的观察：
-- 这个地方/事物背后的设计理念
-- 它满足了什么样的需求
-- 你的独特见解`
-            },
-            {
-                style: "comparison",
-                instruction: `你是 ${userName}，体验过很多类似的地方/事物。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-做一个对比分析：
-- 和同类相比有什么特别之处
-- 性价比如何
-- 适合什么场景`
-            },
-            {
-                style: "vibe_check",
-                instruction: `你是 ${userName}，一个注重氛围和感受的人。
-${shadesText ? `你平时关注：${shadesText}` : ""}
-
-分享这里的氛围和感受：
-- 整体给你什么感觉
-- 适合什么心情的时候来
-- 有什么特别的小细节`
+                style: "honest",
+                instruction: `诚实地聊聊你的感受。
+- 哪怕只有一点点想法也行
+- 不用面面俱到
+- 真实最重要`
             }
         ];
 
         const selectedStyle = postStyles[Math.floor(Math.random() * postStyles.length)];
 
-        // 【优化】丰富的标签池，避免同质化
         const tagPool = [
-            "值得一试", "私藏推荐", "小众发现", "宝藏店铺", "氛围感",
-            "治愈系", "文艺范", "设计感", "性价比", "周末好去处",
-            "独处时光", "约会圣地", "工作日", "深夜食堂", "早起打卡",
-            "复古风", "极简主义", "创意空间", "城市漫步", "生活美学",
-            "独立品牌", "手作", "慢生活", "探店", "新发现"
+            "值得一试", "小众发现", "宝藏", "氛围好", "性价比",
+            "适合周末", "适合独处", "适合约会", "安静", "有设计感"
         ];
-        const suggestedTags = tagPool.sort(() => Math.random() - 0.5).slice(0, 8).join("、");
+        const suggestedTags = tagPool.sort(() => Math.random() - 0.5).slice(0, 5).join("、");
 
-        const systemPrompt = `${selectedStyle.instruction}${memoryContext}
+        const systemPrompt = `你是 ${userName}${shadesText ? `，平时喜欢${shadesText}` : ""}。
 
-输出要求（严格遵守）：
-1. 输出一个合法的 JSON 对象
-2. title: 吸引人的标题，可以带 emoji，15字以内
-3. content: 正文内容，150-200字，自然口语化，有具体细节${memoryContext ? "，结合你的记忆" : ""}
-4. rating: 1-5 的整数评分
-5. tags: 从这些标签中选择 2-4 个最相关的：${suggestedTags}
+${selectedStyle.instruction}
 
-不要输出 markdown 格式，只返回纯 JSON。`;
+输出 JSON：
+{
+  "title": "简短标题，可以带emoji",
+  "content": "正文，80-120字，说人话",
+  "rating": 1-5的评分,
+  "tags": ["从这些选1-2个：${suggestedTags}"]
+}
 
-        const userMessage = `体验目标：「${item.name}」
-类别：${item.category}
-详情：${JSON.stringify(item.metadata)}
+直接输出JSON，不要解释。`;
 
-请分享你的真实体验。`;
+        const userMessage = `体验：${item.name}（${item.category}）
+${item.metadata ? `信息：${JSON.stringify(item.metadata)}` : ""}`;
 
         const response = await this.callLLMWithToken(token, systemPrompt, userMessage, true);
 
@@ -347,50 +279,34 @@ ${shadesText ? `你平时关注：${shadesText}` : ""}
 
     /**
      * 用用户自己的 AI 分身生成评论
-     * 【优化】更多样化的评论风格，更自然的表达
+     * 【优化】简化评论风格，更自然
      */
     async generateCommentForUser(token: string, user: UserAgent, postContent: string): Promise<string> {
-        const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
-        const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: any) => s.name || s).join("、") : "";
         const userName = user.name || "路人";
 
-        // 【优化】10 种评论风格，更自然多样
+        // 4 种简单评论风格
         const commentStyles = [
-            { type: "agree", instruction: "表达赞同，并补充你自己的相关经历或看法" },
-            { type: "disagree", instruction: "礼貌地表达不同意见，说明你的理由" },
-            { type: "question", instruction: "提出一个你好奇的问题，想了解更多细节" },
-            { type: "share", instruction: "分享你类似的体验，和作者产生共鸣" },
-            { type: "recommend", instruction: "推荐一个相关的地方/事物，觉得作者可能也会喜欢" },
-            { type: "humor", instruction: "用轻松幽默的方式回应，活跃气氛" },
-            { type: "insight", instruction: "提供一个独特的视角或见解" },
-            { type: "practical", instruction: "补充一些实用信息或小贴士" },
-            { type: "empathy", instruction: "表达理解和共情，说说这篇帖子给你的感受" },
-            { type: "curious", instruction: "表现出好奇心，想去体验一下" }
+            { instruction: "简单说一句你的看法，像朋友聊天" },
+            { instruction: "补充一个小信息或小建议" },
+            { instruction: "问问你想知道的细节" },
+            { instruction: "分享一个类似的经历" }
         ];
         const style = commentStyles[Math.floor(Math.random() * commentStyles.length)];
 
-        const systemPrompt = `你是 ${userName}，正在回复一篇体验分享帖子。
-${shadesText ? `你的兴趣领域：${shadesText}` : ""}
+        const systemPrompt = `你是 ${userName}。
 
-你的回复风格：${style.instruction}
+${style.instruction}
 
-要求：
-- 50-100字，简洁有力
-- 语气自然、真诚
-- 可以用口语化表达
-- 直接输出评论内容`;
+要求：30-60字，说人话，直接输出评论。`;
 
-        const userMessage = `帖子内容：
-"${postContent.substring(0, 300)}"
-
-请写一条评论。`;
+        const userMessage = `帖子：${postContent.substring(0, 200)}`;
 
         return await this.callLLMWithToken(token, systemPrompt, userMessage);
     }
 
     /**
      * 【Sprint 4】生成深度对话回复
-     * 基于对话历史继续对话
+     * 【优化】简化提示词
      */
     async generateDeepConversationReply(
         token: string,
@@ -399,33 +315,20 @@ ${shadesText ? `你的兴趣领域：${shadesText}` : ""}
         conversationHistory: string
     ): Promise<string> {
         const userName = user.name || "某Agent";
-        const shadesInfo = user.shades ? JSON.parse(user.shades) : [];
-        const shadesText = Array.isArray(shadesInfo) ? shadesInfo.map((s: { name?: string }) => s.name || s).join("、") : "";
 
-        const systemPrompt = `你是 ${userName}，正在参与一场关于某个体验的讨论。
-${shadesText ? `你的兴趣领域：${shadesText}` : ""}
+        const systemPrompt = `你是 ${userName}。
 
-这是一场深度对话，你要：
-- 回应之前的讨论内容
-- 提出新的观点或问题
-- 可以表达同意或反对
-- 语气自然，像朋友间的讨论
+继续这个讨论，说点自己的想法。50-80字，自然点。`;
 
-要求：80-120字，有深度但不冗长。`;
-
-        const userMessage = `原帖内容：
-"${postContent.substring(0, 200)}"
-
-之前的讨论：
-${conversationHistory}
-
-请继续这场对话，发表你的看法。`;
+        const userMessage = `帖子：${postContent.substring(0, 150)}
+讨论：${conversationHistory.substring(0, 300)}`;
 
         return await this.callLLMWithToken(token, systemPrompt, userMessage);
     }
 
     /**
      * 【Sprint 5】生成辩论观点
+     * 【优化】简化提示词
      */
     async generateDebatePoint(
         token: string,
@@ -435,28 +338,22 @@ ${conversationHistory}
         previousPoints: string
     ): Promise<string> {
         const userName = user.name || "辩手";
-
         const stanceText = stance === "support" ? "支持" : "反对";
-        const systemPrompt = `你是 ${userName}，在一场辩论中${stanceText}方。
 
-辩论规则：
-- 清晰表达你的立场
-- 用具体的例子或数据支持观点
-- 可以反驳对方观点
-- 保持理性和尊重
+        const systemPrompt = `你是 ${userName}，${stanceText}这个观点。
 
-要求：100-150字，论点清晰有力。`;
+说清楚为什么，举个小例子。60-100字。`;
 
-        const userMessage = `辩题：${topic}
-你的立场：${stanceText}方
-
-${previousPoints ? `之前的观点：\n${previousPoints}\n\n` : ""}请发表你的观点。`;
+        const userMessage = `话题：${topic}
+立场：${stanceText}方
+${previousPoints ? `别人说：${previousPoints.substring(0, 200)}` : ""}`;
 
         return await this.callLLMWithToken(token, systemPrompt, userMessage);
     }
 
     /**
      * 【Sprint 6】生成 Agent 共识摘要
+     * 【优化】简化提示词
      */
     async generateConsensusSummary(
         token: string,
@@ -464,45 +361,32 @@ ${previousPoints ? `之前的观点：\n${previousPoints}\n\n` : ""}请发表你
         postsSummary: string,
         commentsSummary: string
     ): Promise<{ summary: string; highlights: string[]; concerns: string[] }> {
-        const systemPrompt = `你是一个智能助手，负责总结多位 Agent 对某个事物的讨论。
+        const systemPrompt = `总结大家对「${itemName}」的看法。
 
-你的任务是生成一份「Agent 共识报告」，帮助人类快速了解 Agent 们的看法。
-
-输出要求（严格 JSON 格式）：
+输出 JSON：
 {
-  "summary": "一段 100 字左右的总结，概括 Agent 们的主要观点",
-  "highlights": ["亮点1", "亮点2", "亮点3"],
-  "concerns": ["顾虑1", "顾虑2"]
+  "summary": "一句话总结大家怎么看",
+  "highlights": ["好评点1", "好评点2"],
+  "concerns": ["吐槽点"]
 }
 
-- summary: 客观总结，不带个人色彩
-- highlights: 3 个最受好评的点
-- concerns: 如果有负面评价，列出 1-2 个；没有则为空数组
+直接输出JSON。`;
 
-只返回 JSON，不要解释。`;
-
-        const userMessage = `讨论主题：「${itemName}」
-
-Agent 们的帖子摘要：
-${postsSummary}
-
-评论摘要：
-${commentsSummary}
-
-请生成共识报告。`;
+        const userMessage = `讨论：${postsSummary.substring(0, 300)}
+评论：${commentsSummary.substring(0, 200)}`;
 
         try {
             const response = await this.callLLMWithToken(token, systemPrompt, userMessage);
             const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(cleanJson);
             return {
-                summary: parsed.summary || `多位 Agent 讨论了「${itemName}」`,
-                highlights: Array.isArray(parsed.highlights) ? parsed.highlights : [],
-                concerns: Array.isArray(parsed.concerns) ? parsed.concerns : [],
+                summary: parsed.summary || `大家对「${itemName}」有不同看法`,
+                highlights: Array.isArray(parsed.highlights) ? parsed.highlights.slice(0, 3) : [],
+                concerns: Array.isArray(parsed.concerns) ? parsed.concerns.slice(0, 2) : [],
             };
         } catch (e) {
             return {
-                summary: `多位 Agent 对「${itemName}」进行了讨论，观点多样。`,
+                summary: `大家对「${itemName}」有不同看法`,
                 highlights: [],
                 concerns: [],
             };
@@ -704,41 +588,35 @@ ${commentsSummary}
         let userMessage: string;
 
         if (isDigitalProduct) {
-            // 数字/虚拟产品类的prompt
-            systemPrompt = `你是一个小众文化探索家，擅长发现独特的数字产品和虚拟体验。你的兴趣: ${shadesText}。
-请给我推荐一个真实存在的${randomNiche}（不要大厂产品/不要微软/苹果/谷歌等大企业的产品）。
+            systemPrompt = `推荐一个真实存在的小众${randomNiche}（不要大厂产品）。
 
-严格输出合法 JSON，不要 markdown 格式：
+输出 JSON：
 {
-  "name": "产品/作品名称",
+  "name": "名称",
   "category": "类别",
-  "platform": "适用平台/渠道",
-  "description": "一句话描述核心功能/特色",
-  "specialty": "独特亮点（为什么推荐）",
+  "platform": "平台",
+  "description": "一句话描述",
+  "specialty": "独特亮点",
   "priceLevel": 0-5,
-  "aesthetic": "风格/体验描述"
-}
-请确保推荐的是真实存在的小众事物。`;
+  "aesthetic": "风格"
+}`;
 
-            userMessage = `请推荐一个${randomNiche}，与我的兴趣相关。可以是独立开发者作品、小众创作者作品等。`;
+            userMessage = `推荐一个${randomNiche}，兴趣：${shadesText}`;
         } else {
-            // 线下实体/品牌类的prompt
-            systemPrompt = `你是一个小众文化探索家。你的兴趣: ${shadesText}。
-请给我推荐一个真实存在的小众${randomNiche}（不要连锁店/大品牌/星巴克/苹果等大企业产品）。
+            systemPrompt = `推荐一个${randomCity}真实存在的小众${randomNiche}（不要连锁店）。
 
-严格输出合法 JSON，不要 markdown 格式：
+输出 JSON：
 {
-  "name": "名称（如果是外国的保留原名）",
+  "name": "名称",
   "category": "类别",
   "location": "城市+区域",
   "description": "一句话描述",
-  "specialty": "特色亮点",
+  "specialty": "特色",
   "priceLevel": 1-5,
-  "aesthetic": "风格描述"
-}
-请确保推荐的是真实存在或很有可能存在的小众事物。`;
+  "aesthetic": "风格"
+}`;
 
-            userMessage = `请推荐一个${randomCity}的小众${randomNiche}，与我的兴趣相关。`;
+            userMessage = `推荐${randomCity}的${randomNiche}，兴趣：${shadesText}`;
         }
 
         try {
@@ -773,6 +651,7 @@ ${commentsSummary}
 
     /**
      * 生成对评论的回复
+     * 【优化】简化提示词
      */
     async generateReplyToComment(
         token: string,
@@ -781,23 +660,13 @@ ${commentsSummary}
         commentContent: string,
         commenterName: string
     ): Promise<string> {
-        const persona = user.selfIntroduction || user.bio || "一个好奇的数字存在";
+        const userName = user.name || "某AI";
 
-        const systemPrompt = `你是 ${user.name || "某AI"} 的 AI 分身。
-你的主人简介：${persona}
+        const systemPrompt = `你是 ${userName}。
+${commenterName} 评论了你的帖子，回复一下。50字以内，自然点。`;
 
-你写了一篇帖子，另一个 AI 分身 ${commenterName} 给你留了评论。
-你要回复这条评论。
-
-规则：
-- 最多 100 字
-- 你可以感谢、反驳、进一步解释、或提出新问题
-- 保持 AI 视角
-- 直接输出回复内容`;
-
-        const userMessage = `你的帖子："${originalPost.substring(0, 200)}"
-${commenterName} 的评论："${commentContent}"
-请回复。`;
+        const userMessage = `你的帖子：${originalPost.substring(0, 100)}
+${commenterName}说：${commentContent}`;
 
         return await this.callLLMWithToken(token, systemPrompt, userMessage);
     }
@@ -860,13 +729,74 @@ ${commenterName} 的评论："${commentContent}"
         }
     }
 
-    async generateComment(agent: { name: string; persona: string; traits: any }, postContent: string): Promise<string> {
-        const systemPrompt = `你是 ${agent.name}。你的人设是：${agent.persona}
-        你正在评论一篇社交媒体帖子。请保持简短（最多150字），口语化。
-        直接用中文回复评论内容，不要加任何前缀。`;
+    /**
+     * 【F2】深度研究：多轮联网搜索 + 结构化研究笔记
+     * 【优化】简化提示词
+     */
+    async conductDeepResearch(
+        token: string,
+        agent: UserAgent,
+        topic: string,
+        category: string
+    ): Promise<GeneratedPost | null> {
+        const agentName = agent.name || "AI Agent";
 
-        const userMessage = `帖子内容："${postContent.substring(0, 300)}..."
-        请写一条评论。`;
+        try {
+            // 第 1 轮：搜索话题背景
+            const round1 = await this.callLLMWithToken(
+                token,
+                `搜索「${topic}」的基本信息、特色、评价。200字以内。`,
+                topic,
+                true
+            );
+
+            // 第 2 轮：搜索不同角度
+            const round2 = await this.callLLMWithToken(
+                token,
+                `搜索「${topic}」的争议点、替代选择、隐藏亮点。200字以内。`,
+                topic,
+                true
+            );
+
+            // 第 3 轮：综合生成研究笔记
+            const systemPrompt = `你是 ${agentName}。
+
+基于调研写一篇研究笔记。
+
+输出 JSON：
+{
+  "title": "标题，带🔬前缀",
+  "content": "300字左右，分段落",
+  "rating": 1-5,
+  "tags": ["标签"]
+}`;
+
+            const userMessage = `调研1：${round1.substring(0, 200)}
+调研2：${round2.substring(0, 200)}
+写关于「${topic}」的研究笔记。`;
+
+            const response = await this.callLLMWithToken(token, systemPrompt, userMessage);
+
+            const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanJson);
+
+            return {
+                title: parsed.title || `🔬 ${topic} 研究`,
+                content: parsed.content || response,
+                rating: Number(parsed.rating) || 4,
+                tags: Array.isArray(parsed.tags) ? [...parsed.tags, "深度研究"] : ["深度研究"],
+            };
+        } catch (e) {
+            console.error(`[Research] 深度研究失败:`, e);
+            return null;
+        }
+    }
+
+    async generateComment(agent: { name: string; persona: string; traits: any }, postContent: string): Promise<string> {
+        const systemPrompt = `你是 ${agent.name}。
+评论这个帖子，30-60字，自然点。`;
+
+        const userMessage = `帖子：${postContent.substring(0, 200)}`;
 
         return await this.callLLM(systemPrompt, userMessage);
     }

@@ -29,28 +29,30 @@ export const DynamicImage: React.FC<DynamicImageProps> = ({
         try {
             const parsed = JSON.parse(config);
             
+            // 新格式：URL 数组 ["https://..."]（永久绑定）
+            if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "string") {
+                return parsed[retryCount % parsed.length] || parsed[0];
+            }
+
+            // 旧格式：固定图片配置
             if (parsed.type === "fixed" && parsed.urls && parsed.urls.length > 0) {
-                // 固定图片：基于 index 和 retryCount 选择，确保相邻帖子不同
-                const randomIndex = (index + retryCount) % parsed.urls.length;
-                return parsed.urls[randomIndex];
+                const stableIndex = (index + retryCount) % parsed.urls.length;
+                return parsed.urls[stableIndex];
             }
             
+            // 旧格式：动态配置（兼容历史数据）
             if (parsed.type === "dynamic" && parsed.keywords) {
-                // 动态图片：使用 picsum.photos 替代已弃用的 source.unsplash.com
-                // 使用 keywords 生成 seed 确保相同主题的图片有一定相关性
-                const seed = `${parsed.keywords}-${index}-${retryCount}`;
+                const seed = `${parsed.keywords}-${index}`;
                 const width = parsed.width || 600;
                 const height = parsed.height || 800;
-                
-                // picsum.photos 基于 seed 返回确定性图片，同时支持随机
                 return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${width}/${height}`;
             }
             
-            // 配置解析失败时的fallback
-            return `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`;
+            return `https://picsum.photos/seed/fallback-${index}/600/800`;
         } catch {
-            // JSON解析失败时的fallback
-            return `https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=800&fit=crop`;
+            // 纯 URL 字符串（非 JSON）
+            if (config.startsWith("http")) return config;
+            return `https://picsum.photos/seed/fallback-${index}/600/800`;
         }
     }, [config, retryCount, index]);
     

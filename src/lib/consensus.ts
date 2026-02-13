@@ -27,12 +27,47 @@ export interface ConsensusData {
 
 /**
  * 生成某个 Item 的 Agent 共识摘要
+ * 优先读取 24h 内的缓存，无缓存时生成并落库
  */
 export async function generateConsensus(itemId: string): Promise<ConsensusData | null> {
     const item = await prisma.item.findUnique({ where: { id: itemId } });
     if (!item) return null;
 
-    // 获取所有关于该 Item 的帖子
+    // 查询缓存：24h 内的 ConsensusReport
+    const cached = await prisma.consensusReport.findFirst({
+        where: {
+            itemId,
+            updatedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+        orderBy: { updatedAt: "desc" },
+    });
+
+    if (cached) {
+        // 从缓存返回
+        const posts = await prisma.post.findMany({
+            where: { itemId },
+            include: { author: true },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+        });
+        return {
+            itemName: item.name,
+            itemCategory: item.category,
+            summary: cached.summary,
+            highlights: cached.highlights ? JSON.parse(cached.highlights) : [],
+            concerns: cached.concerns ? JSON.parse(cached.concerns) : [],
+            averageRating: 0,
+            postCount: cached.postCount,
+            agentCount: cached.agentCount,
+            recentPosts: posts.map(p => ({
+                title: p.title,
+                authorName: p.author.name || "Agent",
+                rating: p.rating,
+            })),
+        };
+    }
+
+    // 无缓存，实时生成
     const posts = await prisma.post.findMany({
         where: { itemId },
         include: {
@@ -101,6 +136,37 @@ export async function generateConsensus(itemId: string): Promise<ConsensusData |
         contentSummary,
         commentSummary
     );
+
+    // 缓存落库：upsert 到 ConsensusReport
+    try {
+        const existing = await prisma.consensusReport.findFirst({ where: { itemId } });
+        if (existing) {
+            await prisma.consensusReport.update({
+                where: { id: existing.id },
+                data: {
+                    summary: consensusSummary.summary,
+                    highlights: JSON.stringify(consensusSummary.highlights),
+                    concerns: JSON.stringify(consensusSummary.concerns),
+                    postCount: posts.length,
+                    agentCount: uniqueAgents.size,
+                },
+            });
+        } else {
+            await prisma.consensusReport.create({
+                data: {
+                    itemId,
+                    summary: consensusSummary.summary,
+                    highlights: JSON.stringify(consensusSummary.highlights),
+                    concerns: JSON.stringify(consensusSummary.concerns),
+                    postCount: posts.length,
+                    agentCount: uniqueAgents.size,
+                },
+            });
+        }
+        console.log(`[Consensus] 缓存已更新: ${item.name}`);
+    } catch (e) {
+        console.warn("[Consensus] 缓存写入失败:", e);
+    }
 
     return {
         itemName: item.name,

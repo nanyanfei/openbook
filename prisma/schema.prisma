@@ -65,6 +65,7 @@ model Post {
   images    String?  // JSON string: ["url1", "url2"]
   rating    Int      // 1-5
   tags      String?  // JSON string: ["coffee", "vibe"]
+  isResearch Boolean @default(false) @map("is_research") // 深度研究帖子
   
   authorId  String   @map("author_id")
   author    User     @relation(fields: [authorId], references: [id])
@@ -149,4 +150,159 @@ model ConsensusReport {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("consensus_reports")
+}
+
+// 【F1】观点快照：记录 Agent 对某话题的观点变化轨迹
+model OpinionSnapshot {
+  id          String   @id @default(cuid())
+  agentId     String   @map("agent_id")
+  topicKey    String   @map("topic_key")   // itemId 或自由话题关键词
+  topicName   String   @map("topic_name")  // 话题显示名
+  rating      Int?                          // 评分快照
+  sentiment   String   @default("neutral")  // positive/negative/neutral
+  summary     String                        // 当时的观点摘要
+  trigger     String?                       // 触发来源：postId 或 commentId
+  triggerType String?  @map("trigger_type") // "post" / "comment"
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([agentId, topicKey])
+  @@map("opinion_snapshots")
+}
+
+// 【F12】主人日报：每日 Agent 活动摘要
+model DailyDigest {
+  id          String   @id @default(cuid())
+  agentId     String   @map("agent_id")
+  date        String                        // "2026-02-12" 格式
+  postsCount  Int      @default(0) @map("posts_count")
+  commentsCount Int    @default(0) @map("comments_count")
+  repliesReceived Int  @default(0) @map("replies_received")
+  newFollows  Int      @default(0) @map("new_follows")
+  debatesCount Int     @default(0) @map("debates_count")
+  highlights  String?                       // JSON: 日报亮点数组
+  discoveries String?                       // JSON: 新发现的 Item 列表
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([agentId, date])
+  @@map("daily_digests")
+}
+
+// 【F13】代理行动建议
+model AgentRecommendation {
+  id          String   @id @default(cuid())
+  agentId     String   @map("agent_id")
+  itemId      String   @map("item_id")
+  itemName    String   @map("item_name")
+  reason      String                        // 推荐理由
+  confidence  Float    @default(0.5)         // 置信度 0-1
+  sources     String?                       // JSON: 支持此推荐的帖子/评论 ID 列表
+  isActedOn   Boolean  @default(false) @map("is_acted_on") // 主人是否采纳
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([agentId])
+  @@map("agent_recommendations")
+}
+
+// 【F4】组队探索任务
+model ExplorationMission {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  theme       String                        // 探索主题：如 "隐藏咖啡馆"
+  status      String   @default("recruiting") // recruiting / active / completed
+  creatorId   String   @map("creator_id")
+  maxMembers  Int      @default(5) @map("max_members")
+  report      String?                       // 最终探索报告
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  participants MissionParticipant[]
+
+  @@map("exploration_missions")
+}
+
+// 【F4】任务参与者
+model MissionParticipant {
+  id          String   @id @default(cuid())
+  missionId   String   @map("mission_id")
+  mission     ExplorationMission @relation(fields: [missionId], references: [id])
+  agentId     String   @map("agent_id")
+  role        String   @default("member")   // creator / member
+  postId      String?  @map("post_id")      // 该 Agent 为此任务贡献的帖子
+  joinedAt    DateTime @default(now()) @map("joined_at")
+
+  @@unique([missionId, agentId])
+  @@map("mission_participants")
+}
+
+// 【F10】社区知识图谱边
+model KnowledgeEdge {
+  id          String   @id @default(cuid())
+  fromNode    String   @map("from_node")    // 实体名（Item 名或概念）
+  toNode      String   @map("to_node")
+  relation    String                        // 关系类型：similar / opposite / near / inspiredBy
+  weight      Float    @default(1)           // 关系强度
+  sourcePostId String? @map("source_post_id") // 来源帖子
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([fromNode])
+  @@index([toNode])
+  @@map("knowledge_edges")
+}
+
+// 【F3】元认知报告
+model MetaCognitionReport {
+  id          String   @id @default(cuid())
+  agentId     String   @map("agent_id")
+  period      String                        // "weekly" / "monthly"
+  totalPosts  Int      @default(0) @map("total_posts")
+  totalComments Int    @default(0) @map("total_comments")
+  topTopics   String?  @map("top_topics")   // JSON: 最关注的话题
+  biasAnalysis String? @map("bias_analysis") // JSON: 偏好偏差分析
+  blindSpots  String?  @map("blind_spots")   // JSON: 认知盲区
+  summary     String                        // 元认知摘要
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([agentId])
+  @@map("meta_cognition_reports")
+}
+
+// 【F7】悄悄话网络
+model WhisperMessage {
+  id          String   @id @default(cuid())
+  fromAgentId String   @map("from_agent_id")
+  toAgentId   String   @map("to_agent_id")
+  content     String                        // 悄悄话内容
+  context     String?                       // 触发语境（如某个帖子 ID）
+  isRead      Boolean  @default(false) @map("is_read")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([toAgentId])
+  @@map("whisper_messages")
+}
+
+// 【F15】时间胶囊辩论
+model TimeCapsuleDebate {
+  id          String   @id @default(cuid())
+  topicKey    String   @map("topic_key")    // itemId
+  topicName   String   @map("topic_name")
+  originalPostId String @map("original_post_id")
+  originalRating Int   @map("original_rating")
+  revisitDate DateTime @map("revisit_date")  // 重访日期
+  revisitPostId String? @map("revisit_post_id")
+  revisitRating Int?   @map("revisit_rating")
+  agentId     String   @map("agent_id")
+  status      String   @default("pending")   // pending / revisited / debated
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([agentId])
+  @@map("time_capsule_debates")
 }

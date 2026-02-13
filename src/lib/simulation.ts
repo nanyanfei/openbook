@@ -1,9 +1,10 @@
 import prisma from "@/lib/prisma";
 import { AgentBrain } from "@/lib/agent-brain";
-import { getImageConfig } from "@/lib/items";
+import { getImageConfig, fetchImageForPost } from "@/lib/items";
 import { refreshAccessToken } from "./auth";
 import { autoFollowSimilarAgents } from "./social";
 import { detectConflict, triggerDebate } from "./debate";
+import { recordPostOpinion, recordCommentOpinion } from "./opinion";
 
 const brain = new AgentBrain();
 
@@ -115,19 +116,47 @@ export async function generatePostForUser(userId: string) {
         metadata: typeof item.metadata === 'string' ? JSON.parse(item.metadata) : item.metadata
     };
 
-    const generatedPost = await brain.generatePostForUser(token, userAgent, itemForBrain);
+    // 【F2】10% 概率触发深度研究模式
+    const isResearchMode = Math.random() < 0.10;
+    let generatedPost;
+    let isResearch = false;
 
-    // 【Sprint 1】质量过滤：评估帖子质量，低于 5 分则丢弃
-    const qualityScore = await brain.evaluatePostQuality(token, generatedPost.title, generatedPost.content);
-    if (qualityScore < 5) {
-        console.log(`[Quality] 帖子质量过低 (${qualityScore}/10)，丢弃: ${generatedPost.title}`);
-        throw new Error(`帖子质量过低 (${qualityScore}/10)`);
+    if (isResearchMode) {
+        console.log(`[Research] ${user.name} 的 AI 分身进入深度研究模式...`);
+        const researchPost = await brain.conductDeepResearch(token, userAgent, item.name, item.category);
+        if (researchPost) {
+            generatedPost = researchPost;
+            isResearch = true;
+        } else {
+            // 深度研究失败，回退到普通发帖
+            generatedPost = await brain.generatePostForUser(token, userAgent, itemForBrain);
+        }
+    } else {
+        generatedPost = await brain.generatePostForUser(token, userAgent, itemForBrain);
     }
 
-    // 获取图片配置（存储配置对象，前端动态获取图片）
-    const imageConfig = getImageConfig(item.name, item.category);
+    // 【Sprint 1】质量过滤：评估帖子质量，低于 5 分则丢弃（深度研究帖子跳过质量检查）
+    if (!isResearch) {
+        const qualityScore = await brain.evaluatePostQuality(token, generatedPost.title, generatedPost.content);
+        if (qualityScore < 5) {
+            console.log(`[Quality] 帖子质量过低 (${qualityScore}/10)，丢弃: ${generatedPost.title}`);
+            throw new Error(`帖子质量过低 (${qualityScore}/10)`);
+        }
+    }
 
-    // 创建帖子
+    // 获取真实配图 URL（一次获取，永久绑定）
+    const imageConfig = getImageConfig(item.name, item.category);
+    let imageUrl: string;
+    if (imageConfig.type === "fixed" && imageConfig.urls && imageConfig.urls.length > 0) {
+        // 种子数据使用预设图片，随机选一张
+        imageUrl = imageConfig.urls[Math.floor(Math.random() * imageConfig.urls.length)];
+    } else {
+        // 从互联网获取配图（Unsplash 或 picsum）
+        const uniqueId = `${user.id}-${item.name}-${Date.now()}`;
+        imageUrl = await fetchImageForPost(imageConfig.keywords || "lifestyle", uniqueId);
+    }
+
+    // 创建帖子（存储实际 URL，不再存配置对象）
     const post = await prisma.post.create({
         data: {
             title: generatedPost.title,
@@ -135,8 +164,9 @@ export async function generatePostForUser(userId: string) {
             rating: generatedPost.rating,
             authorId: user.id,
             itemId: itemId!,
-            images: JSON.stringify(imageConfig),
+            images: JSON.stringify([imageUrl]),
             tags: JSON.stringify(generatedPost.tags),
+            isResearch,
         },
     });
 
@@ -147,6 +177,20 @@ export async function generatePostForUser(userId: string) {
     });
 
     console.log(`[A2A] 创建帖子: ${post.title}`);
+
+    // 【F1】记录观点快照
+    try {
+        await recordPostOpinion(
+            user.id,
+            itemId!,
+            item.name,
+            post.id,
+            generatedPost.rating,
+            generatedPost.content
+        );
+    } catch (e) {
+        console.warn("[Opinion] 发帖观点记录失败（非阻断）:", e);
+    }
 
     // 将体验写回用户的 Second Me 记忆
     try {
@@ -165,41 +209,41 @@ export async function generatePostForUser(userId: string) {
 /**
  * A2A 互动：让其他用户的 AI 分身评论新帖子
  */
-export async function triggerA2AComments(postId: string, authorId: string) {
+export async function triggerA2AComments(postId: string, authorId: string, maxCommenters?: number) {
     const post = await prisma.post.findUnique({
         where: { id: postId },
         include: { author: true, item: true }
     });
     if (!post) return [];
 
-    // 获取所有非作者的已登录用户（移除数量限制，让所有Agent都有机会评论）
-    const otherUsers = await prisma.user.findMany({
+    // 获取非作者的已登录用户，随机打乱并限制数量
+    let otherUsers = await prisma.user.findMany({
         where: {
             id: { not: authorId },
             accessToken: { not: "" },
         },
     });
+    otherUsers = otherUsers.sort(() => Math.random() - 0.5);
+    if (maxCommenters && maxCommenters > 0) {
+        otherUsers = otherUsers.slice(0, maxCommenters);
+    }
 
     const comments = [];
 
     for (const user of otherUsers) {
         try {
-            // 确保 token 有效
             const token = await ensureValidToken(user.id);
             if (!token) {
                 console.log(`[A2A] ${user.name} token 失效，跳过`);
                 continue;
             }
 
-            // 90%概率评论（高互动密度）
-            const shouldComment = Math.random() < 0.9;
-            
-            if (!shouldComment) {
-                console.log(`[A2A] ${user.name} 跳过评论（10%概率）`);
+            // 简化决策：80% 概率评论（节省 Act API 调用时间）
+            if (Math.random() > 0.8) {
+                console.log(`[A2A] ${user.name} 随机跳过`);
                 continue;
             }
 
-            // 生成评论
             const userAgent = {
                 id: user.id,
                 name: user.name,
@@ -214,14 +258,8 @@ export async function triggerA2AComments(postId: string, authorId: string) {
                 post.content
             );
 
-            // 分析评论情感
-            let commentType = "neutral";
-            try {
-                commentType = await brain.analyzeCommentSentiment(commentContent);
-            } catch (e) {
-                const types = ["echo", "challenge", "question", "neutral"];
-                commentType = types[Math.floor(Math.random() * types.length)];
-            }
+            // 简化情感分析：基于关键词快速判断（节省 API 调用）
+            const commentType = quickSentiment(commentContent);
 
             const comment = await prisma.comment.create({
                 data: {
@@ -233,24 +271,19 @@ export async function triggerA2AComments(postId: string, authorId: string) {
             });
 
             comments.push(comment);
-            console.log(`[A2A] ${user.name} 的 AI 分身评论了: ${commentContent.substring(0, 50)}...`);
+            console.log(`[A2A] ${user.name} 评论成功: ${commentContent.substring(0, 50)}...`);
 
-            // 更新用户最后活跃时间
-            await prisma.user.update({
+            // 【F1】记录评论者的观点快照（fire-and-forget）
+            recordCommentOpinion(
+                user.id, post.itemId, post.item.name,
+                comment.id, commentType, commentContent
+            ).catch(() => {});
+
+            // 更新活跃时间（不 await，fire-and-forget）
+            prisma.user.update({
                 where: { id: user.id },
                 data: { lastActiveAt: new Date() },
-            });
-
-            // 写回记忆
-            try {
-                await brain.writeMemory(
-                    token,
-                    `OpenBook 互动`,
-                    `在 OpenBook 上评论了 ${post.author.name || "某用户"} 关于 ${post.item.name} 的帖子。我的评论：${commentContent.substring(0, 100)}`
-                );
-            } catch (e) {
-                // 非阻断
-            }
+            }).catch(() => {});
 
         } catch (e) {
             console.error(`[A2A] ${user.name} 互动失败:`, e);
@@ -258,6 +291,15 @@ export async function triggerA2AComments(postId: string, authorId: string) {
     }
 
     return comments;
+}
+
+// 快速情感判断（替代 API 调用，节省 ~3s/评论）
+function quickSentiment(text: string): string {
+    const lower = text.toLowerCase();
+    if (/不同意|不太|但是|然而|质疑|反对/.test(lower)) return "challenge";
+    if (/吗|呢|？|\?|为什么|怎么/.test(lower)) return "question";
+    if (/赞同|同意|确实|没错|说得好|喜欢/.test(lower)) return "echo";
+    return "neutral";
 }
 
 /**
@@ -305,57 +347,42 @@ export async function triggerAuthorReplies(postId: string) {
         });
         if (existingReply) continue;
 
-        // 判断是否要回复
-        const authorBio = post.author.selfIntroduction || post.author.bio || "创作者";
-        const shouldReply = await brain.shouldReplyToComment(
-            authorToken,
-            authorBio,
-            comment.content
-        );
-
-        if (!shouldReply) {
-            console.log(`[Reply] ${post.author.name} 决定不回复 ${comment.author.name} 的评论`);
-            continue;
-        }
-
-        // 生成回复
-        const replyContent = await brain.generateReplyToComment(
-            authorToken,
-            authorAgent,
-            post.content,
-            comment.content,
-            comment.author.name || "某AI"
-        );
-
-        // 分析回复情感
-        let replyType = "echo";
         try {
-            replyType = await brain.analyzeCommentSentiment(replyContent);
+            // 直接生成回复（跳过 shouldReply 决策 API，节省时间）
+            const replyContent = await brain.generateReplyToComment(
+                authorToken,
+                authorAgent,
+                post.content,
+                comment.content,
+                comment.author.name || "某AI"
+            );
+
+            const replyType = quickSentiment(replyContent);
+
+            const reply = await prisma.comment.create({
+                data: {
+                    content: replyContent,
+                    type: replyType,
+                    postId: post.id,
+                    authorId: post.authorId,
+                    parentId: comment.id,
+                },
+            });
+
+            replies.push(reply);
+            console.log(`[Reply] ${post.author.name} 回复了 ${comment.author.name}: ${replyContent.substring(0, 50)}...`);
         } catch (e) {
-            replyType = "echo";
+            console.error(`[Reply] 回复 ${comment.author.name} 失败:`, e);
         }
-
-        const reply = await prisma.comment.create({
-            data: {
-                content: replyContent,
-                type: replyType,
-                postId: post.id,
-                authorId: post.authorId,
-                parentId: comment.id,
-            },
-        });
-
-        replies.push(reply);
-        console.log(`[Reply] ${post.author.name} 回复了 ${comment.author.name}: ${replyContent.substring(0, 50)}...`);
     }
 
     return replies;
 }
 
 /**
- * 全自动模拟循环：为所有活跃 Agent 自动创建内容和互动
- * 由外部 Cron Job 每 2 分钟触发一次
- * 每次执行：所有 Agent 各发 1 帖 + 全量互评 + 回复 + 辩论
+ * 全自动模拟循环（适配 Vercel Hobby 10s 超时）
+ * 核心策略：每轮只处理 1 个 Agent，发帖+评论合并为原子操作
+ * 确保每篇帖子创建后立即有评论，而不是先全部发帖再批量评论
  */
 export async function runAutoSimulation() {
     const results = {
@@ -379,53 +406,60 @@ export async function runAutoSimulation() {
 
         console.log(`[Cron] 开始自动模拟，${activeUsers.length} 个活跃 Agent`);
 
-        // === 阶段1: 所有 Agent 发帖（每人 1 篇）===
-        const shuffledUsers = [...activeUsers].sort(() => Math.random() - 0.5);
-        const newPostIds: string[] = [];
+        // === 核心：随机选 1 个 Agent，发帖 + 立即评论（原子操作）===
+        const poster = activeUsers[Math.floor(Math.random() * activeUsers.length)];
+        try {
+            const post = await generatePostForUser(poster.id);
+            results.postsCreated++;
+            console.log(`[Cron] ${poster.name} 创建帖子: ${post.title}`);
 
-        for (const poster of shuffledUsers) {
+            // 立即触发其他 Agent 评论（限制最多 3 个评论者）
             try {
-                const post = await generatePostForUser(poster.id);
-                results.postsCreated++;
-                newPostIds.push(post.id);
-                console.log(`[Cron] ${poster.name} 创建帖子: ${post.title}`);
-            } catch (e: any) {
-                results.errors.push(`${poster.name} 发帖失败: ${e.message}`);
-            }
-        }
-
-        // === 阶段2: 所有新帖触发 A2A 评论 + 作者回复 ===
-        for (const postId of newPostIds) {
-            try {
-                const post = await prisma.post.findUnique({ where: { id: postId } });
-                if (!post) continue;
-                const comments = await triggerA2AComments(postId, post.authorId);
+                const comments = await triggerA2AComments(post.id, poster.id, 3);
                 results.commentsCreated += comments.length;
+                console.log(`[Cron] 帖子获得 ${comments.length} 条评论`);
+
+                // 作者回复评论
                 if (comments.length > 0) {
-                    const replies = await triggerAuthorReplies(postId);
-                    results.repliesCreated += replies.length;
+                    try {
+                        const replies = await triggerAuthorReplies(post.id);
+                        results.repliesCreated += replies.length;
+                    } catch { /* 非阻断 */ }
                 }
             } catch (e: any) {
-                results.errors.push(`互评失败: ${e.message}`);
+                results.errors.push(`评论生成失败: ${e.message}`);
             }
+
+            // 辩论检测（轻量，单帖）
+            try {
+                const hasConflict = await detectConflict(post.id);
+                if (hasConflict) {
+                    const debate = await triggerDebate(post.id);
+                    if (debate) results.debatesTriggered++;
+                }
+            } catch { /* 非阻断 */ }
+
+        } catch (e: any) {
+            results.errors.push(`${poster.name} 发帖失败: ${e.message}`);
         }
 
-        // === 阶段3: 旧帖互动（10 篇随机旧帖）===
+        // === 补充：1 篇随机旧帖补评论（让旧内容也有互动）===
         try {
             const postCount = await prisma.post.count();
-            const oldPostsToProcess = Math.min(10, postCount);
-            for (let i = 0; i < oldPostsToProcess; i++) {
+            if (postCount > 1) {
                 const randomSkip = Math.floor(Math.random() * postCount);
                 const randomPost = await prisma.post.findFirst({
                     skip: randomSkip,
                     include: { author: true },
                 });
                 if (randomPost) {
-                    const newComments = await triggerA2AComments(randomPost.id, randomPost.authorId);
+                    const newComments = await triggerA2AComments(randomPost.id, randomPost.authorId, 2);
                     results.commentsCreated += newComments.length;
                     if (newComments.length > 0) {
-                        const replies = await triggerAuthorReplies(randomPost.id);
-                        results.repliesCreated += replies.length;
+                        try {
+                            const replies = await triggerAuthorReplies(randomPost.id);
+                            results.repliesCreated += replies.length;
+                        } catch { /* 非阻断 */ }
                     }
                 }
             }
@@ -433,64 +467,13 @@ export async function runAutoSimulation() {
             console.warn("[Cron] 旧帖互动失败:", e.message);
         }
 
-        // === 阶段4: 未回复评论补回（15 条）===
+        // === 轻量任务：自动关注（仅当前 poster）===
         try {
-            const unrepliedComments = await prisma.comment.findMany({
-                where: { parentId: null, replies: { none: {} } },
-                include: { post: { include: { author: true } }, author: true },
-                take: 15,
-                orderBy: { createdAt: "desc" },
-            });
-            for (const comment of unrepliedComments) {
-                if (comment.authorId === comment.post.authorId) continue;
-                try {
-                    const replies = await triggerAuthorReplies(comment.postId);
-                    results.repliesCreated += replies.length;
-                } catch (e: any) { /* 非阻断 */ }
+            const followed = await autoFollowSimilarAgents(poster.id);
+            if (followed > 0) {
+                results.followsCreated += followed;
             }
-        } catch (e: any) {
-            console.warn("[Cron] 未回复评论处理失败:", e.message);
-        }
-
-        // === 阶段5: Agent 自动关注 ===
-        try {
-            for (const u of activeUsers) {
-                const followed = await autoFollowSimilarAgents(u.id);
-                if (followed > 0) {
-                    results.followsCreated += followed;
-                    console.log(`[Social] ${u.name} 关注了 ${followed} 个相似 Agent`);
-                }
-            }
-        } catch (e) {
-            console.warn("[Cron] 自动关注失败:", e);
-        }
-
-        // === 阶段6: 辩论检测（新帖 + 10 篇旧帖）===
-        try {
-            const debateCandidateIds = [...newPostIds];
-            const recentOldPosts = await prisma.post.findMany({
-                where: { id: { notIn: newPostIds } },
-                orderBy: { createdAt: "desc" },
-                take: 10,
-                select: { id: true },
-            });
-            debateCandidateIds.push(...recentOldPosts.map(p => p.id));
-
-            for (const pid of debateCandidateIds) {
-                try {
-                    const hasConflict = await detectConflict(pid);
-                    if (hasConflict) {
-                        const debate = await triggerDebate(pid);
-                        if (debate) {
-                            results.debatesTriggered++;
-                            console.log(`[Debate] 触发辩论: ${debate.topic}`);
-                        }
-                    }
-                } catch (e) { /* 非阻断 */ }
-            }
-        } catch (e) {
-            console.warn("[Cron] 辩论触发失败:", e);
-        }
+        } catch { /* 非阻断 */ }
 
     } catch (e: any) {
         results.errors.push(`模拟循环失败: ${e.message}`);

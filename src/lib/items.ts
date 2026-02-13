@@ -442,6 +442,125 @@ export interface ImageConfig {
     height?: number;
 }
 
+// 进程级限流标记：Unsplash 触发限流后当前进程内跳过，避免浪费请求
+let unsplashRateLimited = false;
+let unsplashRateLimitedAt = 0;
+const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000; // 10 分钟冷却
+
+// 确定性哈希函数：同一输入始终返回同一数字
+function stableHash(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+    }
+    return Math.abs(hash);
+}
+
+// 精选 Unsplash 直链图（覆盖多种主题，始终可用，无需 API）
+const FALLBACK_PHOTO_IDS = [
+    "photo-1554118811-1e0d58224f24", "photo-1495474472287-4d71bcdd2085",
+    "photo-1509042239860-f550ce710b93", "photo-1501339847302-ac426a4a7cbb",
+    "photo-1507003211169-0a1dd7228f2d", "photo-1519681393784-d120267933ba",
+    "photo-1506744038136-46273834b3fb", "photo-1470071459604-3b5ec3a7fe05",
+    "photo-1441974231531-c6227db76b6e", "photo-1472214103451-9374bd1c798e",
+    "photo-1523240795612-9a054b0db644", "photo-1481627834876-b7833e8f5570",
+    "photo-1524995997946-a1c2e315a42f", "photo-1498050108023-c5249f4df085",
+    "photo-1555066931-4365d14bab8c", "photo-1461749280684-dccba630e2f6",
+    "photo-1504805572947-34fad45aed93", "photo-1493612276216-ee3925520721",
+    "photo-1531746790095-e5a41b229e94", "photo-1517694712202-14dd9538aa97",
+    "photo-1516321318423-f06f85e504b3", "photo-1558618666-fcd25c85f82e",
+    "photo-1542831371-29b0f74f9713", "photo-1485827404703-89b55fcc595e",
+    "photo-1526374965328-7f61d4dc18c5", "photo-1550439062-609e1531270e",
+    "photo-1507525428034-b723cf961d3e", "photo-1476514525535-07fb3b4ae5f1",
+    "photo-1504384308090-c894fdcc538d", "photo-1517336714731-489689fd1ca8",
+    "photo-1488590528505-98d2b5aba04b", "photo-1518770660439-4636190af475",
+    "photo-1461988320302-91bde64fc8e4", "photo-1484480974693-6ca0a78fb36b",
+    "photo-1496181133206-80ce9b88a853", "photo-1581091226825-a6a2a5aee158",
+    "photo-1511467687858-23d96c32e4ae", "photo-1508739773434-c26b3d09e071",
+    "photo-1501785888041-af3ef285b470", "photo-1469474968028-56623f02e42e",
+];
+
+/**
+ * 为帖子获取一张真实配图并返回 URL（三层兜底，确保必有图片）
+ * L1: Unsplash API（主题相关，限流感知）
+ * L2: picsum.photos（基于唯一 seed，确定性稳定）
+ * L3: Unsplash 直链精选（无需 API，始终可用）
+ * @param keywords 搜索关键词（英文）
+ * @param uniqueId 帖子唯一标识，用于去重和 seed
+ */
+export async function fetchImageForPost(keywords: string, uniqueId: string): Promise<string> {
+    const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+    const hash = stableHash(uniqueId);
+
+    // === L1: Unsplash API（主题相关）===
+    if (unsplashKey && !isUnsplashRateLimited()) {
+        try {
+            const query = keywords.split(",")[0].trim();
+            const res = await fetch(
+                `https://api.unsplash.com/photos/random?query=${encodeURIComponent(query)}&orientation=portrait&content_filter=high`,
+                {
+                    headers: { Authorization: `Client-ID ${unsplashKey}` },
+                    signal: AbortSignal.timeout(8000),
+                }
+            );
+            if (res.ok) {
+                const data = await res.json();
+                const url = data?.urls?.regular;
+                if (url) {
+                    console.log(`[Image] L1 Unsplash API 成功: ${query}`);
+                    return url;
+                }
+            }
+            if (res.status === 403 || res.status === 429) {
+                markUnsplashRateLimited();
+                console.warn(`[Image] Unsplash 限流 (${res.status})，冷却 10 分钟`);
+            }
+        } catch (e) {
+            console.warn("[Image] L1 Unsplash API 失败:", e);
+        }
+    }
+
+    // === L2: picsum.photos（唯一 seed → 唯一图片）===
+    try {
+        const seed = uniqueId.replace(/[^a-zA-Z0-9]/g, "").substring(0, 32) || String(hash);
+        const picsumUrl = `https://picsum.photos/seed/${seed}/600/800`;
+        const check = await fetch(picsumUrl, {
+            method: "HEAD",
+            redirect: "follow",
+            signal: AbortSignal.timeout(5000),
+        });
+        if (check.ok) {
+            console.log(`[Image] L2 picsum 成功: seed=${seed}`);
+            return picsumUrl;
+        }
+    } catch {
+        console.warn("[Image] L2 picsum 不可用");
+    }
+
+    // === L3: Unsplash 直链精选（始终可用，基于哈希选择确保唯一）===
+    const photoId = FALLBACK_PHOTO_IDS[hash % FALLBACK_PHOTO_IDS.length];
+    const cropSeed = hash % 1000;
+    const fallbackUrl = `https://images.unsplash.com/${photoId}?w=600&h=800&fit=crop&crop=entropy&cs=tinysrgb&seed=${cropSeed}`;
+    console.log(`[Image] L3 精选直链兜底: ${photoId}`);
+    return fallbackUrl;
+}
+
+function isUnsplashRateLimited(): boolean {
+    if (!unsplashRateLimited) return false;
+    if (Date.now() - unsplashRateLimitedAt > RATE_LIMIT_COOLDOWN_MS) {
+        unsplashRateLimited = false;
+        return false;
+    }
+    return true;
+}
+
+function markUnsplashRateLimited(): void {
+    unsplashRateLimited = true;
+    unsplashRateLimitedAt = Date.now();
+}
+
 export async function seedItems(prisma: PrismaClient) {
     for (const item of MOCK_ITEMS) {
         const existing = await prisma.item.findFirst({ where: { name: item.name } });
