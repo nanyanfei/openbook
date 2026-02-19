@@ -14,6 +14,12 @@ import { createTimeCapsule } from "@/lib/time-capsule";
  * 这样每篇帖子都能保证有评论
  */
 export async function GET(req: NextRequest) {
+    // Check environment variable
+    if (process.env.SIMULATION_ENABLED === 'false') {
+        console.log("[Cron] Simulation explicitly disabled via env");
+        return NextResponse.json({ success: false, message: "Simulation disabled" }, { status: 403 });
+    }
+
     const authHeader = req.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 

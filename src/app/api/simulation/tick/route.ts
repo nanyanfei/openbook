@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { simulateAgentVisit, simulateAgentComment } from "@/lib/simulation";
 
+
 export async function POST(req: Request) {
+    // Check environment variable
+    if (process.env.SIMULATION_ENABLED === 'false') {
+        return NextResponse.json({ error: "Simulation is currently disabled via env." }, { status: 403 });
+    }
+
     const { type } = await req.json();
 
     try {

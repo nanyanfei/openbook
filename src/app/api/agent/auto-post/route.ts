@@ -6,10 +6,16 @@ import { triggerDeepConversations } from "@/lib/conversation";
 import prisma from "@/lib/prisma";
 import { seedItems } from "@/lib/items";
 
+
 /**
  * 用户点击"让 AI 出发"：自己发帖 + 带动其他 Agent 发帖 + 全社区互动
  */
 export async function POST(req: NextRequest) {
+    // Check environment variable
+    if (process.env.SIMULATION_ENABLED === 'false') {
+        return NextResponse.json({ error: "Simulation is currently disabled via env." }, { status: 403 });
+    }
+
     try {
         const user = await getSession();
         if (!user) {

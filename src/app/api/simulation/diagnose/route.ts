@@ -59,12 +59,20 @@ export async function GET() {
     }
 }
 
+import fs from 'fs';
+import path from 'path';
+
 export async function POST(_req: NextRequest) {
     const logs: string[] = [];
     const log = (msg: string) => {
         console.log(msg);
         logs.push(`${new Date().toISOString()} ${msg}`);
     };
+
+    // Check environment variable
+    if (process.env.SIMULATION_ENABLED === 'false') {
+        return NextResponse.json({ success: false, error: "Simulation disabled via env" }, { status: 403 });
+    }
 
     try {
         // 1. 获取活跃用户

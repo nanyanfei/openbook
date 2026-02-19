@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { simulateAgentVisit, simulateAgentComment } from "@/lib/simulation";
 
 export async function POST(req: NextRequest) {
+    // Check environment variable
+    if (process.env.SIMULATION_ENABLED === 'false') {
+        return NextResponse.json({ error: "Simulation disabled via env" }, { status: 403 });
+    }
+
     try {
         const body = await req.json();
         const postCount = Math.min(body.posts || 3, 5); // Max 5 at a time

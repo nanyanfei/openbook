@@ -23,7 +23,8 @@
       "user.info.shades",
       "chat",
       "act"
-    ]
+    ],
+    "simulation_enabled": false
   },
   "api": {
     "base_url": "https://app.mindos.com/gate/lab",
